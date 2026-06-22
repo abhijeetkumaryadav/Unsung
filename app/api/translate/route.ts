@@ -210,9 +210,10 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('Translation error:', error);
+    // ✅ FIXED: Using error.message instead of undefined 'text'
     return NextResponse.json(
       { 
-        translatedText: text || '', 
+        translatedText: '', 
         note: 'Translation failed. Showing original text.',
         error: error.message 
       },
