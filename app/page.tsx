@@ -146,11 +146,10 @@ export default function Home() {
                   <a
                     key={item.id || index}
                     href={item.link || "#"}
-                    className="block p-3 border rounded-lg transition group"
+                    className="block p-3 border rounded-lg transition-colors duration-200 group hover:border-red-500 dark:hover:border-red-600"
                     style={{ 
                       borderColor: isDark ? darkBorder : '#e2e8f0',
                       backgroundColor: isDark ? 'transparent' : 'transparent',
-                      hover: isDark ? { borderColor: '#dc2626' } : { borderColor: '#fecaca' }
                     }}
                   >
                     <div className="flex items-start gap-3">
