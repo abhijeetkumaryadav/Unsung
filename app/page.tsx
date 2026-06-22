@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Header from "./components/Header";
 import TrendingTicker from "./components/TrendingTicker";
@@ -24,7 +24,8 @@ import {
 import { useLanguage } from "./context/LanguageContext";
 import { useTheme } from "./context/ThemeContext";
 
-export default function Home() {
+// Separate component that uses useSearchParams
+function HomeContent() {
   const { currentLanguage } = useLanguage();
   const { isDark } = useTheme();
   const searchParams = useSearchParams();
@@ -206,5 +207,21 @@ export default function Home() {
       </main>
       <Footer />
     </div>
+  );
+}
+
+// Main component with Suspense boundary
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#f8fafc' }}>
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-t-red-600 rounded-full animate-spin mx-auto"></div>
+          <p className="text-sm mt-4 text-gray-500">Loading...</p>
+        </div>
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
   );
 }
