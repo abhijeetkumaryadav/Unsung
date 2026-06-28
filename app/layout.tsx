@@ -23,6 +23,9 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "UNSUNG News",
   },
+  verification: {
+    google: "bfPOGzn2XTzqGSc4MBBtBbKzfWrBTN39aluAN9vhKAs",
+  },
 };
 
 export const viewport: Viewport = {
