@@ -1,0 +1,15 @@
+# worker/wrangler.toml
+name = "unsung-news-worker"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+[[d1_databases]]
+binding = "unsung_news_db"
+database_name = "unsung-news-db"
+database_id = "6cc24563-82eb-422d-b2cf-0c5e4f8ea32b"
+
+[env.production]
+vars = { NODE_ENV = "production" }
+
+[env.development]
+vars = { NODE_ENV = "development" }

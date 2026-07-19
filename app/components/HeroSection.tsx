@@ -1,9 +1,9 @@
+// app/components/HeroSection.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Play, TrendingDown, TrendingUp, ChevronRight, Tv } from "lucide-react";
-import { heroData } from "@/app/lib/data";
 import { getTvChannels, getMarket } from "@/app/lib/dataService";
 import { useTheme } from "@/app/context/ThemeContext";
 import { useLanguage } from "@/app/context/LanguageContext";
@@ -80,13 +80,11 @@ export default function HeroSection() {
   const filterChannelsByLanguage = (channels: TVChannel[], lang: string): TVChannel[] => {
     if (!channels || channels.length === 0) return [];
     
-    // When "All Languages" is selected, show only featured channels
     if (lang === 'all') {
       const featured = channels.filter(ch => ch.featuredInAll === true);
       return featured.length > 0 ? featured : channels;
     }
     
-    // For specific language, filter by language field
     const filtered = channels.filter(channel => {
       if (!channel.language) return true;
       return channel.language === lang;

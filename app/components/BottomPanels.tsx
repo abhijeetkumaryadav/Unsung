@@ -1,9 +1,9 @@
+// app/components/BottomPanels.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { Coins, CloudSun, DollarSign, Play, ChevronLeft, ChevronRight, Plus, Trophy, X } from "lucide-react";
 import { getMarket, getWeather, getVideos, getSports, getWeatherCities } from "@/app/lib/dataService";
-import { marketData as defaultMarket, weatherData as defaultWeather } from "@/app/lib/data";
 import { useLanguage } from "@/app/context/LanguageContext";
 import { useTheme } from "@/app/context/ThemeContext";
 
@@ -64,17 +64,15 @@ export default function BottomPanels({ initialData }: BottomPanelsProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hlsInstance, setHlsInstance] = useState<any>(null);
 
-  // Filter videos by language - supports "all" for featured content
+  // Filter videos by language
   const filterVideosByLanguage = (videoList: VideoData[], lang: string): VideoData[] => {
     if (!videoList || videoList.length === 0) return [];
     
-    // When "All Languages" is selected, show only featured videos
     if (lang === 'all') {
       const featured = videoList.filter(v => v.featuredInAll === true);
       return featured.length > 0 ? featured : videoList;
     }
     
-    // For specific language, filter by language field
     const filtered = videoList.filter(video => {
       if (!video.language) return true;
       return video.language === lang;

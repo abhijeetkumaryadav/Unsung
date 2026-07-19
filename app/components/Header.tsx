@@ -1,3 +1,4 @@
+// app/components/Header.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -5,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Menu, Search, Tv, ChevronDown, X, Globe, Check } from "lucide-react";
 import Sidebar from "./Sidebar";
-import { categories, socialLinks } from "@/app/lib/data";
+import { categories } from "@/app/lib/data";
 import { useLanguage, LANGUAGES } from "@/app/context/LanguageContext";
 import { useTheme } from "@/app/context/ThemeContext";
 
@@ -76,6 +77,9 @@ export default function Header({ searchQuery = "", onSearch }: HeaderProps) {
     if (currentLanguage === 'all') return 'All';
     return currentLang?.nativeName || 'English';
   };
+
+  // YouTube URL from environment or hardcoded
+  const YOUTUBE_URL = process.env.NEXT_PUBLIC_YOUTUBE_URL || "https://www.youtube.com/@Unsung-v2l";
 
   return (
     <>
@@ -267,7 +271,7 @@ export default function Header({ searchQuery = "", onSearch }: HeaderProps) {
 
               {/* LIVE TV BUTTON */}
               <a 
-                href={socialLinks.youtube} 
+                href={YOUTUBE_URL} 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="bg-red-600 hover:bg-red-700 text-white font-black rounded-lg px-3 sm:px-5 h-9 sm:h-10 flex items-center gap-1 sm:gap-2 shadow-lg shadow-red-600/20 transition-all active:scale-95 cursor-pointer relative overflow-hidden group"
@@ -294,7 +298,6 @@ export default function Header({ searchQuery = "", onSearch }: HeaderProps) {
                     key={cat.name}
                     href={cat.link}
                     onClick={() => {
-                      // Clear search when navigating via any category
                       clearSearch();
                     }}
                     className={`transition-colors h-full flex items-center px-1 sm:px-1 border-b-2 ${

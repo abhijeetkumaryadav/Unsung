@@ -1,3 +1,4 @@
+// app/admin/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -28,27 +29,30 @@ import {
   getFooterDescription,
   getSports,
   getWeatherCities,
+  getSocialLinks,
+  saveStory,
+  deleteStory,
+  saveVideo,
+  deleteVideo,
+  saveTvChannel,
+  deleteTvChannel,
+  saveTicker,
+  deleteTicker,
+  saveElectionStates,
+  saveElectionConfig,
+  toggleElectionVisibility,
+  saveNoElectionMessage,
+  saveMarketData,
+  saveWeatherData,
+  saveWeatherCities,
+  saveSports,
+  saveFooterDescription,
+  saveSocialLinks
 } from "@/app/lib/dataService";
 
-async function saveToFile(section: string, data: any): Promise<boolean> {
-  try {
-    const response = await fetch('/api/update-data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ section, data })
-    });
-    const result = await response.json();
-    if (result.success) {
-      return true;
-    } else {
-      console.error('Save failed:', result.error);
-      return false;
-    }
-  } catch (error) {
-    console.error('Save error:', error);
-    return false;
-  }
-}
+// ============================================================
+// CONSTANTS
+// ============================================================
 
 const ALL_CATEGORIES = [
   "Latest",
@@ -87,15 +91,23 @@ interface SocialLink {
   url: string;
 }
 
-// Each state now holds its own parties
 interface ElectionState {
   name: string;
   totalSeats?: number;
   notes?: string;
   links?: { title: string; url: string }[];
   parties: { key: string; name: string; color: string }[];
-  [key: string]: any; // for seat counts
+  [key: string]: any;
 }
+
+const fillColorMap: Record<string, string> = {
+  orange: "#f97316", red: "#dc2626", sky: "#0ea5e9", slate: "#64748b",
+  green: "#10b981", purple: "#8b5cf6", yellow: "#eab308", pink: "#ec4899", blue: "#3b82f6",
+};
+
+// ============================================================
+// MAIN ADMIN PANEL COMPONENT
+// ============================================================
 
 export default function AdminPanel() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -191,11 +203,9 @@ export default function AdminPanel() {
   const [videoExtractLoading, setVideoExtractLoading] = useState(false);
   const [isTranslatingNews, setIsTranslatingNews] = useState(false);
 
-  // Helper for election colors
-  const fillColorMap: Record<string, string> = {
-    orange: "#f97316", red: "#dc2626", sky: "#0ea5e9", slate: "#64748b",
-    green: "#10b981", purple: "#8b5cf6", yellow: "#eab308", pink: "#ec4899", blue: "#3b82f6",
-  };
+  // ============================================================
+  // EFFECTS
+  // ============================================================
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -203,7 +213,10 @@ export default function AdminPanel() {
     }
   }, [isAuthenticated]);
 
-  // Helper: count items by language
+  // ============================================================
+  // HELPER FUNCTIONS
+  // ============================================================
+
   const countByLanguage = (items: any[], lang: string) => {
     return items.filter(item => item.language === lang).length;
   };
@@ -212,10 +225,27 @@ export default function AdminPanel() {
     return items.filter(item => !item.language).length;
   };
 
+  const showMessage = (msg: string) => {
+    setSavedMessage(msg);
+    setTimeout(() => setSavedMessage(""), 4000);
+  };
+
+  const detectStreamType = (url: string): "youtube" | "hls" | "iframe" => {
+    if (!url) return "iframe";
+    const lower = url.toLowerCase();
+    if (lower.includes("youtube.com") || lower.includes("youtu.be")) return "youtube";
+    if (lower.includes(".m3u8")) return "hls";
+    return "iframe";
+  };
+
+  // ============================================================
+  // LOAD DATA
+  // ============================================================
+
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [top, latest, crick, mark, weath, electStates, electConfig, vid, tick, channels, vis, msg, footer, sp, wc] = await Promise.all([
+      const [top, latest, crick, mark, weath, electStates, electConfig, vid, tick, channels, vis, msg, footer, sp, wc, social] = await Promise.all([
         getTopStories(),
         getLatestNews(),
         getCricket(),
@@ -230,19 +260,19 @@ export default function AdminPanel() {
         getNoElectionMessage(),
         getFooterDescription(),
         getSports(),
-        getWeatherCities()
+        getWeatherCities(),
+        getSocialLinks()
       ]);
+      
       setTopStoriesState(top);
       setLatestNewsState(latest);
       setCricketState(crick);
       setMarketState(mark);
       setWeatherState(weath);
       
-      // --- Per‑state parties: ensure each state has a `parties` array ---
       let loadedStates = electStates || [];
       loadedStates = loadedStates.map((state: any) => {
         if (!state.parties || !Array.isArray(state.parties) || state.parties.length === 0) {
-          // Assign default parties if missing
           return {
             ...state,
             parties: [
@@ -255,7 +285,6 @@ export default function AdminPanel() {
         }
         return state;
       });
-      // Ensure the loadedStates matches the expected ElectionState[] type (may lack required 'parties' in source types)
       setElectionStatesState(loadedStates as any as ElectionState[]);
       
       setElectionConfigState(electConfig);
@@ -267,31 +296,8 @@ export default function AdminPanel() {
       setFooterDesc(footer);
       setSportsState(sp);
       setWeatherCitiesState(wc);
+      setSocialLinks(social || []);
       
-      // Load social links
-      try {
-        const response = await fetch('/api/get-data?key=socialLinks&t=' + Date.now());
-        if (response.ok) {
-          const data = await response.json();
-          if (data && Array.isArray(data)) {
-            setSocialLinks(data);
-          } else {
-            setSocialLinks([
-              { platform: "YouTube", url: "https://www.youtube.com/@Unsung-v2l" },
-              { platform: "Facebook", url: "#" },
-              { platform: "X (Twitter)", url: "#" },
-              { platform: "Instagram", url: "#" }
-            ]);
-          }
-        }
-      } catch {
-        setSocialLinks([
-          { platform: "YouTube", url: "https://www.youtube.com/@Unsung-v2l" },
-          { platform: "Facebook", url: "#" },
-          { platform: "X (Twitter)", url: "#" },
-          { platform: "Instagram", url: "#" }
-        ]);
-      }
     } catch (error) {
       console.error('Load error:', error);
       showMessage('Failed to load data');
@@ -299,9 +305,17 @@ export default function AdminPanel() {
     setLoading(false);
   };
 
+  // ============================================================
+  // AUTHENTICATION - Using Environment Variables
+  // ============================================================
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (username === "admin" && password === "@Kalavathi devi01") {
+    // Get credentials from environment variables with fallback
+    const adminUser = process.env.ADMIN_USERNAME || "admin";
+    const adminPass = process.env.ADMIN_PASSWORD || "kalavathi devi";
+    
+    if (username === adminUser && password === adminPass) {
       setIsAuthenticated(true);
       setAuthError("");
       loadAllData();
@@ -316,10 +330,9 @@ export default function AdminPanel() {
     setPassword("");
   };
 
-  const showMessage = (msg: string) => {
-    setSavedMessage(msg);
-    setTimeout(() => setSavedMessage(""), 4000);
-  };
+  // ============================================================
+  // TRANSLATION FUNCTIONS
+  // ============================================================
 
   const handleTranslate = async (text: string, targetLang: string, sourceLang?: string): Promise<string> => {
     if (!text.trim()) return text;
@@ -339,14 +352,6 @@ export default function AdminPanel() {
     } finally {
       setTranslating(false);
     }
-  };
-
-  const detectStreamType = (url: string): "youtube" | "hls" | "iframe" => {
-    if (!url) return "iframe";
-    const lower = url.toLowerCase();
-    if (lower.includes("youtube.com") || lower.includes("youtu.be")) return "youtube";
-    if (lower.includes(".m3u8")) return "hls";
-    return "iframe";
   };
 
   const handleTranslateNews = async () => {
@@ -413,11 +418,19 @@ export default function AdminPanel() {
     showMessage(`Removed ${LANGUAGES.find(l => l.code === lang)?.nativeName || lang} translation`);
   };
 
+  // ============================================================
+  // ARTICLE EXTRACTION
+  // ============================================================
+
   const extractVideoTitle = async () => {
     if (!videoForm.link.trim()) { showMessage('Please enter a video URL first.'); return; }
     setVideoExtractLoading(true);
     try {
-      const response = await fetch('/api/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: videoForm.link }) });
+      const response = await fetch('/api/extract', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ url: videoForm.link }) 
+      });
       const data = await response.json();
       if (data.title) {
         setVideoForm({ ...videoForm, title: data.title });
@@ -425,7 +438,9 @@ export default function AdminPanel() {
       } else {
         showMessage('Could not extract title. Please enter manually.');
       }
-    } catch (error) { showMessage('Failed to extract title.'); }
+    } catch (error) { 
+      showMessage('Failed to extract title.'); 
+    }
     setVideoExtractLoading(false);
   };
 
@@ -433,56 +448,91 @@ export default function AdminPanel() {
     if (!extractUrl.trim()) return;
     setExtracting(true);
     try {
-      const response = await fetch("/api/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: extractUrl }) });
+      const response = await fetch("/api/extract", { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" }, 
+        body: JSON.stringify({ url: extractUrl }) 
+      });
       const data = await response.json();
-      if (data.error) { showMessage(data.error); }
-      else {
+      if (data.error) { 
+        showMessage(data.error); 
+      } else {
         const newsId = `auto-${Date.now()}`;
         setExtractedData(data);
         setNewsForm({
-          title: data.title || "", category: "India", image: data.image || "",
-          link: `/news/${newsId}`, description: data.content || data.description || "",
-          language: extractedLang, featuredInAll: false, translations: {}
+          title: data.title || "", 
+          category: "India", 
+          image: data.image || "",
+          link: `/news/${newsId}`, 
+          description: data.content || data.description || "",
+          language: extractedLang, 
+          featuredInAll: false, 
+          translations: {}
         });
         showMessage(`✅ Extracted! Language: ${LANGUAGES.find(l => l.code === extractedLang)?.nativeName}.`);
       }
-    } catch (error) { showMessage("Extraction failed!"); }
+    } catch (error) { 
+      showMessage("Extraction failed!"); 
+    }
     setExtracting(false);
   };
 
-  const saveSection = async (section: string, data: any, successMsg: string) => {
-    setLoading(true);
-    const success = await saveToFile(section, data);
-    if (success) showMessage(successMsg);
-    else showMessage('Failed to save!');
-    setLoading(false);
-    return success;
+  // ============================================================
+  // NEWS (STORIES) FUNCTIONS
+  // ============================================================
+
+  const resetNewsForm = () => {
+    setEditingNews(null); 
+    setExtractedData(null); 
+    setEditingTranslation(null);
+    setNewsForm({ 
+      title: "", 
+      category: "India", 
+      image: "", 
+      link: "", 
+      description: "", 
+      language: "en", 
+      featuredInAll: false, 
+      translations: {} 
+    });
   };
 
   const handleAddNews = async () => {
     if (!newsForm.title.trim()) return;
     const newsId = `auto-${Date.now()}`;
     const entry = {
-      id: newsId, title: newsForm.title, category: newsForm.category,
-      time: "Just now", image: newsForm.image || "https://images.unsplash.com/photo-1504370805625-d32c54b16100?auto=format&fit=crop&q=80&w=300",
-      link: `/news/${newsId}`, description: newsForm.description || "",
-      language: newsForm.language, featuredInAll: newsForm.featuredInAll,
+      id: newsId, 
+      title: newsForm.title, 
+      category: newsForm.category,
+      time: "Just now", 
+      image: newsForm.image || "https://images.unsplash.com/photo-1504370805625-d32c54b16100?auto=format&fit=crop&q=80&w=300",
+      link: `/news/${newsId}`, 
+      description: newsForm.description || "",
+      language: newsForm.language, 
+      featuredInAll: newsForm.featuredInAll,
       translations: newsForm.translations || {}
     };
-    let updated;
-    if (newsType === "top") { updated = [entry, ...topStories]; setTopStoriesState(updated); }
-    else { updated = [entry, ...latestNews]; setLatestNewsState(updated); }
-    const section = newsType === "top" ? "topStories" : "latestNews";
-    await saveSection(section, updated, "Story added!");
+    if (newsType === "top") { 
+      setTopStoriesState([entry, ...topStories]); 
+    } else { 
+      setLatestNewsState([entry, ...latestNews]); 
+    }
+    await saveStory(entry, newsType === "top" ? 'top' : 'latest');
+    showMessage("✅ Story added!");
     resetNewsForm();
   };
 
   const handleEditNews = (item: any, type: string) => {
-    setEditingNews(item); setNewsType(type);
+    setEditingNews(item); 
+    setNewsType(type);
     setNewsForm({
-      title: item.title || "", category: item.category || "India", image: item.image || "",
-      link: item.link || "", description: item.description || "",
-      language: item.language || "en", featuredInAll: item.featuredInAll || false,
+      title: item.title || "", 
+      category: item.category || "India", 
+      image: item.image || "",
+      link: item.link || "", 
+      description: item.description || "",
+      language: item.language || "en", 
+      featuredInAll: item.featuredInAll || false,
       translations: item.translations || {}
     });
   };
@@ -490,53 +540,86 @@ export default function AdminPanel() {
   const handleUpdateNews = async () => {
     if (!editingNews) return;
     const updates = {
-      title: newsForm.title, category: newsForm.category, image: newsForm.image,
-      link: newsForm.link || `/news/${editingNews.id}`, description: newsForm.description,
-      language: newsForm.language, featuredInAll: newsForm.featuredInAll,
+      id: editingNews.id,
+      title: newsForm.title, 
+      category: newsForm.category, 
+      image: newsForm.image,
+      link: newsForm.link || `/news/${editingNews.id}`, 
+      description: newsForm.description,
+      language: newsForm.language, 
+      featuredInAll: newsForm.featuredInAll,
       translations: newsForm.translations
     };
-    let updated;
-    if (newsType === "top") { updated = topStories.map((s: any) => s.id === editingNews.id ? { ...s, ...updates } : s); setTopStoriesState(updated); }
-    else { updated = latestNews.map((s: any) => s.id === editingNews.id ? { ...s, ...updates } : s); setLatestNewsState(updated); }
-    const section = newsType === "top" ? "topStories" : "latestNews";
-    await saveSection(section, updated, "Story updated!");
+    if (newsType === "top") { 
+      const updated = topStories.map((s: any) => s.id === editingNews.id ? { ...s, ...updates } : s); 
+      setTopStoriesState(updated); 
+    } else { 
+      const updated = latestNews.map((s: any) => s.id === editingNews.id ? { ...s, ...updates } : s); 
+      setLatestNewsState(updated); 
+    }
+    await saveStory(updates, newsType === "top" ? 'top' : 'latest');
+    showMessage("✅ Story updated!");
     resetNewsForm();
   };
 
   const handleDeleteNews = async (id: string, type: string) => {
     if (!confirm("Delete this story?")) return;
-    let updated;
-    if (type === "top") { updated = topStories.filter((s: any) => s.id !== id); setTopStoriesState(updated); }
-    else { updated = latestNews.filter((s: any) => s.id !== id); setLatestNewsState(updated); }
-    const section = type === "top" ? "topStories" : "latestNews";
-    await saveSection(section, updated, "Story deleted!");
+    if (type === "top") { 
+      const updated = topStories.filter((s: any) => s.id !== id); 
+      setTopStoriesState(updated); 
+    } else { 
+      const updated = latestNews.filter((s: any) => s.id !== id); 
+      setLatestNewsState(updated); 
+    }
+    await deleteStory(id, type as 'top' | 'latest');
+    showMessage("✅ Story deleted!");
   };
 
-  const resetNewsForm = () => {
-    setEditingNews(null); setExtractedData(null); setEditingTranslation(null);
-    setNewsForm({ title: "", category: "India", image: "", link: "", description: "", language: "en", featuredInAll: false, translations: {} });
+  // ============================================================
+  // VIDEO FUNCTIONS
+  // ============================================================
+
+  const resetVideoForm = () => {
+    setEditingVideo(null);
+    setVideoForm({ 
+      title: "", 
+      img: "", 
+      link: "", 
+      category: "Latest", 
+      language: "en", 
+      featuredInAll: false, 
+      translations: {} 
+    });
   };
 
   const handleAddVideo = async () => {
     if (!videoForm.title.trim() || !videoForm.link.trim()) return;
     const entry = {
-      id: `vid-${Date.now()}`, title: videoForm.title,
+      id: `vid-${Date.now()}`, 
+      title: videoForm.title,
       img: videoForm.img || "https://images.unsplash.com/photo-1504370805625-d32c54b16100?auto=format&fit=crop&q=80&w=300",
-      link: videoForm.link, category: videoForm.category || "Latest",
-      language: videoForm.language, featuredInAll: videoForm.featuredInAll,
+      link: videoForm.link, 
+      category: videoForm.category || "Latest",
+      language: videoForm.language, 
+      featuredInAll: videoForm.featuredInAll,
       translations: videoForm.translations || {}
     };
-    const updated = [...videos, entry]; setVideosState(updated);
-    await saveSection("videos", updated, "Video added!");
+    setVideosState([...videos, entry]);
+    await saveVideo(entry);
+    showMessage("✅ Video added!");
     resetVideoForm();
   };
 
   const handleEditVideo = (item: any) => {
     setEditingVideo(item);
     setVideoForm({
-      title: item.title || "", img: item.img || "", link: item.link || "",
-      category: item.category || "Latest", language: item.language || "en",
-      featuredInAll: item.featuredInAll || false, translations: item.translations || {}
+      title: item.title || "", 
+      img: item.img || "", 
+      link: item.link || "",
+      category: item.category || "Latest", 
+      language: item.language || "en",
+      featuredInAll: item.featuredInAll || false, 
+      translations: item.translations || {}
     });
   };
 
@@ -544,135 +627,280 @@ export default function AdminPanel() {
     if (!editingVideo) return;
     const updated = videos.map((v: any) => v.id === editingVideo.id ? { ...v, ...videoForm } : v);
     setVideosState(updated);
-    await saveSection("videos", updated, "Video updated!");
+    await saveVideo({ ...videoForm, id: editingVideo.id });
+    showMessage("✅ Video updated!");
     resetVideoForm();
   };
 
   const handleDeleteVideo = async (id: string) => {
     if (!confirm("Delete this video?")) return;
-    const updated = videos.filter((v: any) => v.id !== id); setVideosState(updated);
-    await saveSection("videos", updated, "Video deleted!");
+    const updated = videos.filter((v: any) => v.id !== id); 
+    setVideosState(updated);
+    await deleteVideo(id);
+    showMessage("✅ Video deleted!");
   };
 
-  const resetVideoForm = () => {
-    setEditingVideo(null);
-    setVideoForm({ title: "", img: "", link: "", category: "Latest", language: "en", featuredInAll: false, translations: {} });
+  // ============================================================
+  // TV CHANNEL FUNCTIONS
+  // ============================================================
+
+  const resetChannelForm = () => {
+    setEditingChannel(null);
+    setChannelForm({ 
+      name: "", 
+      logo: "", 
+      urls: [""], 
+      type: "youtube", 
+      language: "en", 
+      featuredInAll: false, 
+      translations: {} 
+    });
+  };
+
+  const addChannelUrl = () => { 
+    setChannelForm({ ...channelForm, urls: [...channelForm.urls, ""] }); 
+  };
+
+  const removeChannelUrl = (index: number) => {
+    if (channelForm.urls.length <= 1) { 
+      showMessage("At least one URL is required."); 
+      return; 
+    }
+    const newUrls = channelForm.urls.filter((_, i) => i !== index);
+    setChannelForm({ ...channelForm, urls: newUrls });
+  };
+
+  const updateChannelUrl = (index: number, value: string) => {
+    const newUrls = [...channelForm.urls]; 
+    newUrls[index] = value;
+    setChannelForm({ 
+      ...channelForm, 
+      urls: newUrls, 
+      type: index === 0 ? detectStreamType(value) : channelForm.type 
+    });
   };
 
   const handleAddChannel = async () => {
     if (!channelForm.name.trim() || !channelForm.urls[0]?.trim()) return;
     const validUrls = channelForm.urls.filter(u => u.trim());
-    if (validUrls.length === 0) { showMessage("Please add at least one URL."); return; }
+    if (validUrls.length === 0) { 
+      showMessage("Please add at least one URL."); 
+      return; 
+    }
     const detectedType = detectStreamType(validUrls[0]);
     const entry = {
-      id: `ch-${Date.now()}`, name: channelForm.name,
+      id: `ch-${Date.now()}`, 
+      name: channelForm.name,
       logo: channelForm.logo || channelForm.name.substring(0, 2).toUpperCase(),
-      urls: validUrls, type: channelForm.type || detectedType,
-      language: channelForm.language, featuredInAll: channelForm.featuredInAll,
+      urls: validUrls, 
+      type: channelForm.type || detectedType,
+      language: channelForm.language, 
+      featuredInAll: channelForm.featuredInAll,
       translations: channelForm.translations || {}
     };
-    const updated = [...tvChannels, entry]; setTvChannelsState(updated);
-    await saveSection("tvChannels", updated, "Channel added!");
+    setTvChannelsState([...tvChannels, entry]);
+    await saveTvChannel(entry);
+    showMessage("✅ Channel added!");
     resetChannelForm();
   };
 
   const handleEditChannel = (item: any) => {
     setEditingChannel(item);
     setChannelForm({
-      name: item.name || "", logo: item.logo || "",
+      name: item.name || "", 
+      logo: item.logo || "",
       urls: item.urls && item.urls.length > 0 ? [...item.urls] : [item.embedUrl || ""],
-      type: item.type || "youtube", language: item.language || "en",
-      featuredInAll: item.featuredInAll || false, translations: item.translations || {}
+      type: item.type || "youtube", 
+      language: item.language || "en",
+      featuredInAll: item.featuredInAll || false, 
+      translations: item.translations || {}
     });
   };
 
   const handleUpdateChannel = async () => {
     if (!editingChannel) return;
     const validUrls = channelForm.urls.filter(u => u.trim());
-    if (validUrls.length === 0) { showMessage("Please add at least one URL."); return; }
+    if (validUrls.length === 0) { 
+      showMessage("Please add at least one URL."); 
+      return; 
+    }
     const detectedType = detectStreamType(validUrls[0]);
-    const updated = tvChannels.map((c: any) => c.id === editingChannel.id ? { ...c, name: channelForm.name, urls: validUrls, logo: channelForm.logo, type: channelForm.type || detectedType, language: channelForm.language, featuredInAll: channelForm.featuredInAll, translations: channelForm.translations } : c);
+    const updated = tvChannels.map((c: any) => 
+      c.id === editingChannel.id ? { 
+        ...c, 
+        name: channelForm.name, 
+        urls: validUrls, 
+        logo: channelForm.logo, 
+        type: channelForm.type || detectedType, 
+        language: channelForm.language, 
+        featuredInAll: channelForm.featuredInAll, 
+        translations: channelForm.translations 
+      } : c
+    );
     setTvChannelsState(updated);
-    await saveSection("tvChannels", updated, "Channel updated!");
+    await saveTvChannel({ 
+      id: editingChannel.id, 
+      ...channelForm, 
+      urls: validUrls, 
+      type: channelForm.type || detectedType 
+    });
+    showMessage("✅ Channel updated!");
     resetChannelForm();
   };
 
   const handleDeleteChannel = async (id: string) => {
     if (!confirm("Delete this channel?")) return;
-    const updated = tvChannels.filter((c: any) => c.id !== id); setTvChannelsState(updated);
-    await saveSection("tvChannels", updated, "Channel deleted!");
+    const updated = tvChannels.filter((c: any) => c.id !== id); 
+    setTvChannelsState(updated);
+    await deleteTvChannel(id);
+    showMessage("✅ Channel deleted!");
   };
 
-  const addChannelUrl = () => { setChannelForm({ ...channelForm, urls: [...channelForm.urls, ""] }); };
-  const removeChannelUrl = (index: number) => {
-    if (channelForm.urls.length <= 1) { showMessage("At least one URL is required."); return; }
-    const newUrls = channelForm.urls.filter((_, i) => i !== index);
-    setChannelForm({ ...channelForm, urls: newUrls });
-  };
-  const updateChannelUrl = (index: number, value: string) => {
-    const newUrls = [...channelForm.urls]; newUrls[index] = value;
-    setChannelForm({ ...channelForm, urls: newUrls, type: index === 0 ? detectStreamType(value) : channelForm.type });
-  };
-  const resetChannelForm = () => {
-    setEditingChannel(null);
-    setChannelForm({ name: "", logo: "", urls: [""], type: "youtube", language: "en", featuredInAll: false, translations: {} });
+  // ============================================================
+  // TICKER FUNCTIONS
+  // ============================================================
+
+  const resetTickerForm = () => {
+    setEditingTicker(null);
+    setTickerForm({ 
+      text: "", 
+      active: true, 
+      linkedStories: [], 
+      linkedLatest: [], 
+      linkedVideos: [], 
+      translations: {} 
+    });
   };
 
   const handleAddTicker = async () => {
     if (!newTickerText.trim()) return;
-    const entry = { id: `tick-${Date.now()}`, text: newTickerText, active: true, linkedStories: [], linkedLatest: [], linkedVideos: [], translations: {} };
-    const updated = [...ticker, entry]; setTickerState(updated);
-    await saveSection("ticker", updated, "Ticker added!");
+    const entry = { 
+      id: `tick-${Date.now()}`, 
+      text: newTickerText, 
+      active: true, 
+      linkedStories: [], 
+      linkedLatest: [], 
+      linkedVideos: [], 
+      translations: {} 
+    };
+    setTickerState([...ticker, entry]);
+    await saveTicker(entry);
+    showMessage("✅ Ticker added!");
     setNewTickerText("");
   };
 
   const handleEditTicker = (item: any) => {
     setEditingTicker(item);
-    setTickerForm({ text: item.text || "", active: item.active !== false, linkedStories: item.linkedStories || [], linkedLatest: item.linkedLatest || [], linkedVideos: item.linkedVideos || [], translations: item.translations || {} });
+    setTickerForm({ 
+      text: item.text || "", 
+      active: item.active !== false, 
+      linkedStories: item.linkedStories || [], 
+      linkedLatest: item.linkedLatest || [], 
+      linkedVideos: item.linkedVideos || [], 
+      translations: item.translations || {} 
+    });
   };
 
   const handleUpdateTicker = async () => {
     if (!editingTicker) return;
     const updated = ticker.map((t: any) => t.id === editingTicker.id ? { ...t, ...tickerForm } : t);
     setTickerState(updated);
-    await saveSection("ticker", updated, "Ticker updated!");
+    await saveTicker({ ...tickerForm, id: editingTicker.id });
+    showMessage("✅ Ticker updated!");
     resetTickerForm();
   };
 
   const handleDeleteTicker = async (id: string) => {
     if (!confirm("Delete this ticker?")) return;
-    const updated = ticker.filter((t: any) => t.id !== id); setTickerState(updated);
-    await saveSection("ticker", updated, "Ticker deleted!");
-  };
-
-  const resetTickerForm = () => {
-    setEditingTicker(null);
-    setTickerForm({ text: "", active: true, linkedStories: [], linkedLatest: [], linkedVideos: [], translations: {} });
+    const updated = ticker.filter((t: any) => t.id !== id); 
+    setTickerState(updated);
+    await deleteTicker(id);
+    showMessage("✅ Ticker deleted!");
   };
 
   const toggleLinkedItem = (type: 'stories' | 'latest' | 'videos', id: string) => {
     const key = type === 'stories' ? 'linkedStories' : type === 'latest' ? 'linkedLatest' : 'linkedVideos';
     const current = tickerForm[key] as string[];
-    if (current.includes(id)) setTickerForm({ ...tickerForm, [key]: current.filter((i: string) => i !== id) });
-    else setTickerForm({ ...tickerForm, [key]: [...current, id] });
+    if (current.includes(id)) {
+      setTickerForm({ ...tickerForm, [key]: current.filter((i: string) => i !== id) });
+    } else {
+      setTickerForm({ ...tickerForm, [key]: [...current, id] });
+    }
   };
 
-  const getFilteredTopStories = () => topStories.filter(s => { if (tickerLinkLang && s.language !== tickerLinkLang) return false; if (tickerLinkCat && s.category !== tickerLinkCat) return false; return true; });
-  const getFilteredLatestNews = () => latestNews.filter(s => { if (tickerLinkLang && s.language !== tickerLinkLang) return false; if (tickerLinkCat && s.category !== tickerLinkCat) return false; return true; });
-  const getFilteredVideos = () => videos.filter(v => { if (tickerLinkLang && v.language !== tickerLinkLang) return false; if (tickerLinkCat && v.category !== tickerLinkCat) return false; return true; });
+  const getFilteredTopStories = () => topStories.filter(s => { 
+    if (tickerLinkLang && s.language !== tickerLinkLang) return false; 
+    if (tickerLinkCat && s.category !== tickerLinkCat) return false; 
+    return true; 
+  });
+  const getFilteredLatestNews = () => latestNews.filter(s => { 
+    if (tickerLinkLang && s.language !== tickerLinkLang) return false; 
+    if (tickerLinkCat && s.category !== tickerLinkCat) return false; 
+    return true; 
+  });
+  const getFilteredVideos = () => videos.filter(v => { 
+    if (tickerLinkLang && v.language !== tickerLinkLang) return false; 
+    if (tickerLinkCat && v.category !== tickerLinkCat) return false; 
+    return true; 
+  });
 
-  const addSport = () => { setSportsState([...sports, { sport: "New Sport", match: "", score: "", detail: "", show: true }]); showMessage("New sport added."); };
-  const removeSport = (index: number) => { setSportsState(sports.filter((_, i) => i !== index)); };
-  const updateSport = (index: number, field: string, value: any) => { const updated = [...sports]; updated[index][field] = value; setSportsState(updated); };
-  const toggleSportShow = (index: number) => { const updated = [...sports]; updated[index].show = !updated[index].show; setSportsState(updated); };
-  const saveSports = async () => { await saveSection("sports", sports, "Sports saved!"); };
+  // ============================================================
+  // SPORTS FUNCTIONS
+  // ============================================================
 
-  const addCity = () => { setWeatherCitiesState([...weatherCities, { city: "New City", temp: "0°C", condition: "Unknown" }]); };
-  const removeCity = (index: number) => { setWeatherCitiesState(weatherCities.filter((_, i) => i !== index)); };
-  const updateCity = (index: number, field: string, value: any) => { const updated = [...weatherCities]; updated[index][field] = value; setWeatherCitiesState(updated); };
-  const saveCities = async () => { await saveSection("weatherCities", weatherCities, "Cities saved!"); };
+  const addSport = () => { 
+    setSportsState([...sports, { sport: "New Sport", match: "", score: "", detail: "", show: true }]); 
+    showMessage("New sport added."); 
+  };
 
-  // ---------- ELECTION: PER-STATE PARTIES ----------
+  const removeSport = (index: number) => { 
+    setSportsState(sports.filter((_, i) => i !== index)); 
+  };
+
+  const updateSport = (index: number, field: string, value: any) => { 
+    const updated = [...sports]; 
+    updated[index][field] = value; 
+    setSportsState(updated); 
+  };
+
+  const toggleSportShow = (index: number) => { 
+    const updated = [...sports]; 
+    updated[index].show = !updated[index].show; 
+    setSportsState(updated); 
+  };
+
+  const saveSportsData = async () => { 
+    await saveSports(sports);
+    showMessage("✅ Sports saved!");
+  };
+
+  // ============================================================
+  // WEATHER CITY FUNCTIONS
+  // ============================================================
+
+  const addCity = () => { 
+    setWeatherCitiesState([...weatherCities, { city: "New City", temp: "0°C", condition: "Unknown" }]); 
+  };
+
+  const removeCity = (index: number) => { 
+    setWeatherCitiesState(weatherCities.filter((_, i) => i !== index)); 
+  };
+
+  const updateCity = (index: number, field: string, value: any) => { 
+    const updated = [...weatherCities]; 
+    updated[index][field] = value; 
+    setWeatherCitiesState(updated); 
+  };
+
+  const saveCitiesData = async () => { 
+    await saveWeatherCities(weatherCities);
+    showMessage("✅ Cities saved!");
+  };
+
+  // ============================================================
+  // ELECTION FUNCTIONS
+  // ============================================================
+
   const addElectionState = () => {
     const defaultParties = [
       { key: "bjp", name: "BJP", color: "orange" },
@@ -687,10 +915,9 @@ export default function AdminPanel() {
       notes: "",
       links: []
     };
-    // Initialize seat counts for each party
     defaultParties.forEach(p => { newState[p.key] = 0; });
     setElectionStatesState([...electionStates, newState]);
-    showMessage("New state added. Edit name, parties and seats, then save.");
+    showMessage("New state added.");
   };
 
   const removeElectionState = (index: number) => {
@@ -700,21 +927,18 @@ export default function AdminPanel() {
     showMessage("State removed.");
   };
 
-  // Update a seat count for a specific state and party
   const updateElectionStateSeat = (stateIndex: number, partyKey: string, value: number) => {
     const updated = [...electionStates];
     updated[stateIndex][partyKey] = value;
     setElectionStatesState(updated);
   };
 
-  // Update a state's field (name, totalSeats, notes)
   const updateElectionStateField = (stateIndex: number, field: string, value: any) => {
     const updated = [...electionStates];
     updated[stateIndex][field] = value;
     setElectionStatesState(updated);
   };
 
-  // Add a party to a specific state
   const addPartyToState = (stateIndex: number) => {
     const state = electionStates[stateIndex];
     const newKey = `party${Date.now()}`;
@@ -726,7 +950,6 @@ export default function AdminPanel() {
     showMessage(`New party added to ${state.name}.`);
   };
 
-  // Remove a party from a specific state
   const removePartyFromState = (stateIndex: number, partyIndex: number) => {
     const state = electionStates[stateIndex];
     if (state.parties.length <= 1) {
@@ -736,27 +959,22 @@ export default function AdminPanel() {
     const removed = state.parties[partyIndex];
     if (!confirm(`Remove "${removed.name}" from ${state.name}?`)) return;
     const updated = [...electionStates];
-    // Remove from parties array
     updated[stateIndex].parties = updated[stateIndex].parties.filter((_, i) => i !== partyIndex);
-    // Remove seat data
     delete updated[stateIndex][removed.key];
     setElectionStatesState(updated);
     showMessage(`Party "${removed.name}" removed from ${state.name}.`);
   };
 
-  // Update party details (name, color, key) for a specific state
   const updatePartyInState = (stateIndex: number, partyIndex: number, field: 'key' | 'name' | 'color', value: string) => {
     const updated = [...electionStates];
     const party = updated[stateIndex].parties[partyIndex];
     if (field === 'key') {
       const newKey = value.trim().toLowerCase().replace(/\s+/g, '_');
       if (newKey && newKey !== party.key) {
-        // Check if key already exists
         if (updated[stateIndex].parties.some(p => p.key === newKey)) {
           showMessage(`Party key "${newKey}" already exists in this state.`);
           return;
         }
-        // Move seat data from old key to new key
         const seatValue = updated[stateIndex][party.key] || 0;
         updated[stateIndex][newKey] = seatValue;
         delete updated[stateIndex][party.key];
@@ -770,7 +988,6 @@ export default function AdminPanel() {
     setElectionStatesState(updated);
   };
 
-  // Add a link to a state
   const addLinkToState = (stateIndex: number) => {
     const updated = [...electionStates];
     if (!updated[stateIndex].links) updated[stateIndex].links = [];
@@ -794,23 +1011,26 @@ export default function AdminPanel() {
     }
   };
 
-  // Save all election states (including per‑state parties)
-  const saveElectionStates = async () => {
-    await saveSection("electionStates", electionStates, "Election states saved!");
+  const saveElectionStatesData = async () => {
+    await saveElectionStates(electionStates);
+    showMessage("✅ Election states saved!");
   };
 
-  const toggleElectionVisibility = async () => {
+  const toggleElectionVisibilityData = async () => {
     const nv = !electionVisible;
     setElectionVisible(nv);
-    await saveSection("electionVisible", nv, nv ? "Election visible" : "Election hidden");
+    await toggleElectionVisibility(nv);
+    showMessage(nv ? "Election visible" : "Election hidden");
   };
 
-  const saveNoElectionMessage = async () => {
-    await saveSection("noElectionMessage", noElectionMessage, "Message saved!");
+  const saveNoElectionMessageData = async () => {
+    await saveNoElectionMessage(noElectionMessage);
+    showMessage("✅ Message saved!");
   };
 
-  const saveElectionConfig = async () => {
-    await saveSection("electionConfig", electionConfig, "Election config saved!");
+  const saveElectionConfigData = async () => {
+    await saveElectionConfig(electionConfig);
+    showMessage("✅ Election config saved!");
   };
 
   const autoFetchElection = async () => {
@@ -819,7 +1039,6 @@ export default function AdminPanel() {
       const response = await fetch("/api/election");
       const data = await response.json();
       if (data && data.hasElection !== false && data.states?.length > 0) {
-        // Convert fetched data to per‑state party format
         const fetchedStates = data.states.map((state: any) => {
           const commonParties = ['bjp', 'sp', 'cong', 'oth', 'dmk', 'aap', 'tdp', 'ycp', 'trs', 'jd', 'rjd'];
           const colorMap: Record<string, string> = {
@@ -836,7 +1055,6 @@ export default function AdminPanel() {
             }
           }
           if (parties.length === 0) {
-            // fallback defaults
             const defaults = [
               { key: "bjp", name: "BJP", color: "orange" },
               { key: "sp", name: "SP", color: "red" },
@@ -863,16 +1081,17 @@ export default function AdminPanel() {
           };
         });
         setElectionStatesState(fetchedStates);
-        await saveSection("electionStates", fetchedStates, "Election states fetched!");
+        await saveElectionStates(fetchedStates);
         if (data.totalSeats) {
           const config = { ...electionConfig, totalSeats: data.totalSeats };
           setElectionConfigState(config);
-          await saveSection("electionConfig", config, "Election config updated!");
+          await saveElectionConfig(config);
         }
+        showMessage("✅ Election states fetched!");
       } else {
         showMessage(data.message || "No active elections");
         setElectionVisible(false);
-        await saveSection("electionVisible", false, "Election hidden - no active elections");
+        await toggleElectionVisibility(false);
       }
     } catch {
       showMessage("Failed to fetch election data");
@@ -880,23 +1099,65 @@ export default function AdminPanel() {
     setLoading(false);
   };
 
-  // ---------- SOCIAL LINKS ----------
-  const addSocialLink = () => { setSocialLinks([...socialLinks, { platform: "", url: "" }]); };
-  const removeSocialLink = (index: number) => { setSocialLinks(socialLinks.filter((_, i) => i !== index)); };
-  const updateSocialLink = (index: number, field: 'platform' | 'url', value: string) => { const updated = [...socialLinks]; updated[index][field] = value; setSocialLinks(updated); };
-  const saveSocialLinks = async () => { const valid = socialLinks.filter(s => s.platform.trim() && s.url.trim()); await saveSection("socialLinks", valid, "Social links saved!"); setSocialLinks(valid); };
+  // ============================================================
+  // SOCIAL LINKS FUNCTIONS
+  // ============================================================
 
-  const saveMarket = async () => { await saveSection("marketData", market, "Market saved!"); };
-  const saveWeather = async () => { await saveSection("weatherData", weather, "Weather saved!"); };
-  const saveFooter = async () => { await saveSection("footerDescription", footerDesc, "Footer saved!"); };
+  const addSocialLink = () => { 
+    setSocialLinks([...socialLinks, { platform: "", url: "" }]); 
+  };
+
+  const removeSocialLink = (index: number) => { 
+    setSocialLinks(socialLinks.filter((_, i) => i !== index)); 
+  };
+
+  const updateSocialLink = (index: number, field: 'platform' | 'url', value: string) => { 
+    const updated = [...socialLinks]; 
+    updated[index][field] = value; 
+    setSocialLinks(updated); 
+  };
+
+  const saveSocialLinksData = async () => { 
+    const valid = socialLinks.filter(s => s.platform.trim() && s.url.trim()); 
+    await saveSocialLinks(valid);
+    setSocialLinks(valid);
+    showMessage("✅ Social links saved!");
+  };
+
+  // ============================================================
+  // MARKET, WEATHER, FOOTER FUNCTIONS
+  // ============================================================
+
+  const saveMarketDataFn = async () => { 
+    await saveMarketData(market);
+    showMessage("✅ Market saved!");
+  };
+
+  const saveWeatherDataFn = async () => { 
+    await saveWeatherData(weather);
+    showMessage("✅ Weather saved!");
+  };
+
+  const saveFooterDataFn = async () => { 
+    await saveFooterDescription(footerDesc);
+    showMessage("✅ Footer saved!");
+  };
 
   const autoFetchMarket = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/market"); const data = await response.json();
-      if (data && data.usdInr) { setMarketState(data); await saveSection("marketData", data, "Market fetched!"); }
-      else showMessage("No market data available");
-    } catch { showMessage("Failed to fetch market data"); }
+      const response = await fetch("/api/market"); 
+      const data = await response.json();
+      if (data && data.usdInr) { 
+        setMarketState(data); 
+        await saveMarketData(data);
+        showMessage("✅ Market fetched!");
+      } else {
+        showMessage("No market data available");
+      }
+    } catch { 
+      showMessage("Failed to fetch market data"); 
+    }
     setLoading(false);
   };
 
@@ -904,14 +1165,25 @@ export default function AdminPanel() {
     setLoading(true);
     try {
       const city = weather.city || "New Delhi";
-      const response = await fetch(`/api/weather?city=${encodeURIComponent(city)}`); const data = await response.json();
-      if (data && data.temp) { setWeatherState(data); await saveSection("weatherData", data, "Weather fetched!"); }
-      else showMessage("No weather data available");
-    } catch { showMessage("Failed to fetch weather data"); }
+      const response = await fetch(`/api/weather?city=${encodeURIComponent(city)}`); 
+      const data = await response.json();
+      if (data && data.temp) { 
+        setWeatherState(data); 
+        await saveWeatherData(data);
+        showMessage("✅ Weather fetched!");
+      } else {
+        showMessage("No weather data available");
+      }
+    } catch { 
+      showMessage("Failed to fetch weather data"); 
+    }
     setLoading(false);
   };
 
-  // ============ LOGIN SCREEN ============
+  // ============================================================
+  // LOGIN SCREEN
+  // ============================================================
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex flex-col justify-center items-center px-4">
@@ -931,7 +1203,10 @@ export default function AdminPanel() {
     );
   }
 
-  // ============ ADMIN PANEL ============
+  // ============================================================
+  // MAIN ADMIN PANEL RENDER
+  // ============================================================
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
       {/* TOP HEADER */}
@@ -990,7 +1265,9 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* MAIN CONTENT */}
+      {/* ============================================================
+          MAIN CONTENT - All Tabs
+          ============================================================ */}
       <div className="max-w-7xl mx-auto px-4 py-6">
 
         {/* ==================== DASHBOARD ==================== */}
@@ -999,7 +1276,6 @@ export default function AdminPanel() {
             <h2 className="text-xl font-black text-slate-900 mb-1">Dashboard Overview</h2>
             <p className="text-xs text-slate-500 mb-4">Monitor content across all languages</p>
 
-            {/* Language Filter for Dashboard */}
             <div className="flex items-center gap-3 mb-6 flex-wrap">
               <span className="text-xs font-bold text-slate-600">Filter by Language:</span>
               <div className="flex flex-wrap gap-1.5">
@@ -1014,7 +1290,6 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            {/* Featured Content Management - Only in "All" view */}
             {dashboardLangFilter === "all" && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
                 <div className="flex items-center gap-2 mb-3">
@@ -1026,7 +1301,6 @@ export default function AdminPanel() {
                 </div>
                 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  {/* Top Stories Featured */}
                   <div className="bg-white rounded-lg border border-amber-200 p-3">
                     <h4 className="text-xs font-bold text-slate-700 mb-2">
                       Top Stories ({topStories.filter((s: any) => s.featuredInAll).length} featured)
@@ -1043,7 +1317,11 @@ export default function AdminPanel() {
                                 s.id === story.id ? { ...s, featuredInAll: !s.featuredInAll } : s
                               );
                               setTopStoriesState(updated);
-                              await saveSection("topStories", updated, `"${story.title.substring(0, 30)}..." ${story.featuredInAll ? 'removed from' : 'added to'} All Languages`);
+                              const updatedStory = updated.find((s: any) => s.id === story.id);
+                              if (updatedStory) {
+                                await saveStory(updatedStory, 'top');
+                              }
+                              showMessage(`"${story.title.substring(0, 30)}..." ${story.featuredInAll ? 'removed from' : 'added to'} All Languages`);
                             }}
                             className="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
                           />
@@ -1054,7 +1332,6 @@ export default function AdminPanel() {
                     </div>
                   </div>
 
-                  {/* Latest News Featured */}
                   <div className="bg-white rounded-lg border border-amber-200 p-3">
                     <h4 className="text-xs font-bold text-slate-700 mb-2">
                       Latest News ({latestNews.filter((s: any) => s.featuredInAll).length} featured)
@@ -1071,7 +1348,11 @@ export default function AdminPanel() {
                                 s.id === story.id ? { ...s, featuredInAll: !s.featuredInAll } : s
                               );
                               setLatestNewsState(updated);
-                              await saveSection("latestNews", updated, `"${story.title.substring(0, 30)}..." ${story.featuredInAll ? 'removed from' : 'added to'} All Languages`);
+                              const updatedStory = updated.find((s: any) => s.id === story.id);
+                              if (updatedStory) {
+                                await saveStory(updatedStory, 'latest');
+                              }
+                              showMessage(`"${story.title.substring(0, 30)}..." ${story.featuredInAll ? 'removed from' : 'added to'} All Languages`);
                             }}
                             className="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
                           />
@@ -1082,7 +1363,6 @@ export default function AdminPanel() {
                     </div>
                   </div>
 
-                  {/* Videos + Channels Featured */}
                   <div className="space-y-3">
                     <div className="bg-white rounded-lg border border-amber-200 p-3">
                       <h4 className="text-xs font-bold text-slate-700 mb-2">
@@ -1100,7 +1380,11 @@ export default function AdminPanel() {
                                   v.id === vid.id ? { ...v, featuredInAll: !v.featuredInAll } : v
                                 );
                                 setVideosState(updated);
-                                await saveSection("videos", updated, `"${vid.title.substring(0, 30)}..." ${vid.featuredInAll ? 'removed from' : 'added to'} All Languages`);
+                                const updatedVideo = updated.find((v: any) => v.id === vid.id);
+                                if (updatedVideo) {
+                                  await saveVideo(updatedVideo);
+                                }
+                                showMessage(`"${vid.title.substring(0, 30)}..." ${vid.featuredInAll ? 'removed from' : 'added to'} All Languages`);
                               }}
                               className="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
                             />
@@ -1126,7 +1410,11 @@ export default function AdminPanel() {
                                   c.id === ch.id ? { ...c, featuredInAll: !c.featuredInAll } : c
                                 );
                                 setTvChannelsState(updated);
-                                await saveSection("tvChannels", updated, `"${ch.name}" ${ch.featuredInAll ? 'removed from' : 'added to'} All Languages`);
+                                const updatedChannel = updated.find((c: any) => c.id === ch.id);
+                                if (updatedChannel) {
+                                  await saveTvChannel(updatedChannel);
+                                }
+                                showMessage(`"${ch.name}" ${ch.featuredInAll ? 'removed from' : 'added to'} All Languages`);
                               }}
                               className="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
                             />
@@ -1141,10 +1429,8 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {/* ALL LANGUAGES VIEW */}
             {dashboardLangFilter === "all" ? (
               <>
-                {/* Summary Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
                   <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                     <p className="text-[10px] font-bold text-slate-400 uppercase">Top Stories</p>
@@ -1168,7 +1454,6 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
-                {/* Language Breakdown Table */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
                   <div className="p-4 border-b border-slate-200">
                     <h3 className="text-sm font-bold text-slate-800">Content by Language</h3>
@@ -1217,8 +1502,7 @@ export default function AdminPanel() {
                 </div>
               </>
             ) : (
-              <>
-                {/* Single Language View */}
+              <div>
                 <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-6 mb-4">
                   <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
                     <Globe className="w-4 h-4 text-red-500" />
@@ -1244,7 +1528,6 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
-                {/* Content lists for selected language */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-4">
                     <h4 className="text-sm font-bold text-slate-800 mb-3">Stories</h4>
@@ -1290,10 +1573,9 @@ export default function AdminPanel() {
                     </div>
                   </div>
                 </div>
-              </>
+              </div>
             )}
 
-            {/* Quick Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                 <p className="text-xs font-bold text-slate-400 uppercase">Ticker Items</p>
@@ -1343,7 +1625,6 @@ export default function AdminPanel() {
               <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center justify-between">
                 {editingNews ? "Edit Story" : "Add New Story"}
                 <div className="flex items-center gap-3">
-                  {/* Featured in All toggle */}
                   <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 cursor-pointer">
                     <input 
                       type="checkbox" 
@@ -1527,7 +1808,7 @@ export default function AdminPanel() {
                 <h3 className="text-sm font-bold text-slate-800">Sport Entries</h3>
                 <div className="flex gap-2">
                   <button onClick={addSport} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1"><Plus className="w-3 h-3" /> Add Sport</button>
-                  <button onClick={saveSports} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save All</button>
+                  <button onClick={saveSportsData} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save All</button>
                 </div>
               </div>
               {sports.map((sport, idx) => (
@@ -1568,7 +1849,7 @@ export default function AdminPanel() {
                 <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Gold Rate</label><input type="text" value={market.goldRate} onChange={(e) => setMarketState({...market, goldRate: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
                 <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Gold Change</label><input type="text" value={market.goldChange} onChange={(e) => setMarketState({...market, goldChange: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
               </div>
-              <button onClick={saveMarket} className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Market Data</button>
+              <button onClick={saveMarketDataFn} className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Market Data</button>
             </div>
           </div>
         )}
@@ -1589,14 +1870,14 @@ export default function AdminPanel() {
                   <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">City</label><input type="text" value={weather.city} onChange={(e) => setWeatherState({...weather, city: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
                   <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Condition</label><input type="text" value={weather.condition} onChange={(e) => setWeatherState({...weather, condition: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
                 </div>
-                <button onClick={saveWeather} className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Default City</button>
+                <button onClick={saveWeatherDataFn} className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Default City</button>
               </div>
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-bold text-slate-800">City-wise Weather</h3>
                   <div className="flex gap-2">
                     <button onClick={addCity} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1"><Plus className="w-3 h-3" /> Add City</button>
-                    <button onClick={saveCities} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Cities</button>
+                    <button onClick={saveCitiesData} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Cities</button>
                   </div>
                 </div>
                 {weatherCities.map((city, idx) => (
@@ -1614,7 +1895,7 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* ==================== ELECTION (PER‑STATE PARTIES) ==================== */}
+        {/* ==================== ELECTION ==================== */}
         {activeTab === "election" && (
           <div>
             <h2 className="text-xl font-black text-slate-900 mb-4">Election Data</h2>
@@ -1622,19 +1903,18 @@ export default function AdminPanel() {
               Each state has its own independent party list. Parties can be added, removed, or renamed per state.
             </p>
 
-            {/* Visibility Toggle */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs mb-4">
               <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-2">
                   <label className="text-xs font-bold text-slate-700">Show Election Section:</label>
-                  <button onClick={toggleElectionVisibility} className={`px-3 py-1 rounded-lg text-xs font-bold transition ${electionVisible ? "bg-emerald-600 text-white" : "bg-slate-300 text-slate-600"}`}>
+                  <button onClick={toggleElectionVisibilityData} className={`px-3 py-1 rounded-lg text-xs font-bold transition ${electionVisible ? "bg-emerald-600 text-white" : "bg-slate-300 text-slate-600"}`}>
                     {electionVisible ? "ON" : "OFF"}
                   </button>
                 </div>
                 {!electionVisible && (
                   <div className="flex-1 flex items-center gap-2">
                     <input type="text" placeholder="No election message..." value={noElectionMessage} onChange={(e) => setNoElectionMessageState(e.target.value)} className="flex-1 text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" />
-                    <button onClick={saveNoElectionMessage} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-lg transition">Save Message</button>
+                    <button onClick={saveNoElectionMessageData} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-lg transition">Save Message</button>
                   </div>
                 )}
                 <button onClick={autoFetchElection} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 disabled:opacity-50">
@@ -1643,7 +1923,6 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            {/* Election Config */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs mb-4">
               <h3 className="text-sm font-bold text-slate-800 mb-3">Election Settings</h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1660,16 +1939,15 @@ export default function AdminPanel() {
                   <input type="number" value={electionConfig.totalSeats} onChange={(e) => setElectionConfigState({...electionConfig, totalSeats: Number(e.target.value)})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="e.g., 403" />
                 </div>
               </div>
-              <button onClick={saveElectionConfig} className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Config</button>
+              <button onClick={saveElectionConfigData} className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Config</button>
             </div>
 
-            {/* State-wise Management with Per‑State Parties */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-bold text-slate-800">State-wise Management</h3>
                 <div className="flex gap-2">
                   <button onClick={addElectionState} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1"><Plus className="w-3 h-3" /> Add State</button>
-                  <button onClick={saveElectionStates} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save All States</button>
+                  <button onClick={saveElectionStatesData} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save All States</button>
                 </div>
               </div>
 
@@ -1678,7 +1956,6 @@ export default function AdminPanel() {
                   const totalSeats = state.totalSeats || electionConfig.totalSeats || 0;
                   return (
                     <div key={stateIdx} className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                      {/* State Header */}
                       <div className="flex items-center gap-3 mb-4">
                         <input 
                           type="text" 
@@ -1706,7 +1983,6 @@ export default function AdminPanel() {
                         </button>
                       </div>
 
-                      {/* Per‑State Party Management */}
                       <div className="mb-4">
                         <div className="flex items-center justify-between mb-2">
                           <label className="text-[10px] font-bold text-slate-400 uppercase">Parties &amp; Seats</label>
@@ -1781,7 +2057,6 @@ export default function AdminPanel() {
                         </div>
                       </div>
 
-                      {/* State Notes */}
                       <div className="mb-3">
                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">State Notes</label>
                         <textarea 
@@ -1792,7 +2067,6 @@ export default function AdminPanel() {
                         />
                       </div>
 
-                      {/* External Links */}
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <label className="block text-[10px] font-bold text-slate-400 uppercase">Reference Links</label>
@@ -1991,7 +2265,7 @@ export default function AdminPanel() {
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs mb-6">
               <h3 className="text-sm font-bold text-slate-800 mb-3">Description</h3>
               <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Footer Description</label><textarea value={footerDesc} onChange={(e) => setFooterDesc(e.target.value)} className="w-full text-sm p-2 border border-slate-200 rounded-lg h-24" /></div>
-              <button onClick={saveFooter} className="mt-4 bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1"><Save className="w-3 h-3" /> Save</button>
+              <button onClick={saveFooterDataFn} className="mt-4 bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1"><Save className="w-3 h-3" /> Save</button>
             </div>
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
               <div className="flex items-center justify-between mb-3">
@@ -2007,7 +2281,7 @@ export default function AdminPanel() {
                   <button onClick={() => removeSocialLink(idx)} className="text-red-500"><Trash2 className="w-4 h-4" /></button>
                 </div>
               ))}
-              <button onClick={saveSocialLinks} className="mt-4 bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1"><Save className="w-3 h-3" /> Save Links</button>
+              <button onClick={saveSocialLinksData} className="mt-4 bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1"><Save className="w-3 h-3" /> Save Links</button>
             </div>
           </div>
         )}
