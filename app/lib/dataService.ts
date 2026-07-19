@@ -1,9 +1,18 @@
 // app/lib/dataService.ts
-// ============================================================
-// COMPLETE DATA SERVICE - Production Ready
-// ============================================================
-
 import {
+  topStories as defaultTopStories,
+  latestNews as defaultLatestNews,
+  cricketData as defaultCricket,
+  marketData as defaultMarket,
+  weatherData as defaultWeather,
+  electionStates as defaultElectionStates,
+  electionConfig as defaultElectionConfig,
+  trendingVideos as defaultVideos,
+  tvChannels as defaultTvChannels,
+  trendingTickerItems as defaultTicker,
+  footerData as defaultFooter,
+  defaultSports,
+  defaultWeatherCities,
   type NewsItem,
   type CricketData,
   type MarketData,
@@ -15,157 +24,80 @@ import {
   type TickerItem,
   type SportItem,
   type WeatherCity,
-  categories,
-  languages,
-  footerData,
-  socialLinks
 } from "./data";
 
-// ============================================================
-// HELPER FUNCTIONS
-// ============================================================
+const WORKER_API = process.env.NEXT_PUBLIC_WORKER_API || 'https://news-api.unsung.workers.dev';
 
-async function callD1<T>(action: string, params?: any): Promise<T | null> {
+// ------------------------------------------------------------------
+// Helper: fetch from Worker
+// ------------------------------------------------------------------
+async function fetchFromWorker<T>(key: string): Promise<T | null> {
   try {
-    const url = new URL(
-      `/api/d1?action=${action}`,
-      typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
-    );
-    
-    let language = 'all';
-    if (typeof window !== 'undefined') {
-      language = localStorage.getItem('unsung_language') || 'all';
-    }
-    url.searchParams.set('language', language);
-
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          url.searchParams.set(key, String(value));
-        }
-      });
-    }
-
-    const response = await fetch(url.toString(), {
-      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-    });
-
-    if (!response.ok) {
-      console.warn(`D1 API failed for ${action}: ${response.status}`);
-      return null;
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error(`D1 API error for ${action}:`, error);
+    const res = await fetch(`${WORKER_API}/api/get-data?key=${key}&t=${Date.now()}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
     return null;
   }
 }
 
-async function saveToD1(action: string, data: any): Promise<boolean> {
+// ------------------------------------------------------------------
+// Helper: save to Worker via Next.js proxy (keeps secret safe)
+// ------------------------------------------------------------------
+export async function saveToWorker(section: string, data: any): Promise<boolean> {
   try {
-    const response = await fetch('/api/d1', {
+    const res = await fetch('/api/update-data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, data })
+      body: JSON.stringify({ section, data }),
     });
-    const result = await response.json();
+    const result = await res.json();
     return result.success === true;
-  } catch (error) {
-    console.error(`D1 save error for ${action}:`, error);
+  } catch {
     return false;
   }
 }
 
-// ============================================================
-// GET FUNCTIONS
-// ============================================================
-
+// ------------------------------------------------------------------
+// Data getters – each tries Worker first, then fallback to defaults
+// ------------------------------------------------------------------
 export async function getTopStories(): Promise<NewsItem[]> {
-  try {
-    const data = await callD1<NewsItem[]>('getTopStories');
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching topStories:', error);
-    return [];
-  }
+  const data = await fetchFromWorker<NewsItem[]>('topStories');
+  return (data && data.length > 0) ? data : defaultTopStories;
 }
 
 export async function getLatestNews(): Promise<NewsItem[]> {
-  try {
-    const data = await callD1<NewsItem[]>('getLatestNews');
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching latestNews:', error);
-    return [];
-  }
+  const data = await fetchFromWorker<NewsItem[]>('latestNews');
+  return (data && data.length > 0) ? data : defaultLatestNews;
 }
 
 export async function getCricket(): Promise<CricketData> {
-  try {
-    const response = await fetch('/api/cricket');
-    if (response.ok) {
-      const data = await response.json();
-      if (data && data.match) return data;
-    }
-    return { match: "", score: "", overs: "" };
-  } catch (error) {
-    console.error('Error fetching cricket:', error);
-    return { match: "", score: "", overs: "" };
-  }
+  return defaultCricket;
 }
 
 export async function getMarket(): Promise<MarketData> {
-  try {
-    const data = await callD1<MarketData>('getMarketData');
-    if (data && data.usdInr) return data;
-    return {} as MarketData;
-  } catch (error) {
-    console.error('Error fetching marketData:', error);
-    return {} as MarketData;
-  }
+  const data = await fetchFromWorker<MarketData>('marketData');
+  return data || defaultMarket;
 }
 
 export async function getWeather(): Promise<WeatherData> {
-  try {
-    const data = await callD1<WeatherData>('getWeatherData');
-    if (data && data.temp) return data;
-    return {} as WeatherData;
-  } catch (error) {
-    console.error('Error fetching weatherData:', error);
-    return {} as WeatherData;
-  }
+  const data = await fetchFromWorker<WeatherData>('weatherData');
+  return data || defaultWeather;
 }
 
 export async function getElectionStates(): Promise<ElectionState[]> {
-  try {
-    const data = await callD1<ElectionState[]>('getElectionStates');
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching electionStates:', error);
-    return [];
-  }
+  const data = await fetchFromWorker<ElectionState[]>('electionStates');
+  return (data && data.length > 0) ? data : defaultElectionStates;
 }
 
 export async function getElectionConfig(): Promise<ElectionConfig> {
-  try {
-    const data = await callD1<ElectionConfig>('getElectionConfig');
-    if (data && data.title) return data;
-    return { title: "Election Center 2026", liveMapTitle: "Live Results Map", totalSeats: 403 };
-  } catch (error) {
-    console.error('Error fetching electionConfig:', error);
-    return { title: "Election Center 2026", liveMapTitle: "Live Results Map", totalSeats: 403 };
-  }
+  const data = await fetchFromWorker<ElectionConfig>('electionConfig');
+  return data || defaultElectionConfig;
 }
 
 export async function getVideos(): Promise<VideoData[]> {
-  try {
-    const data = await callD1<VideoData[]>('getVideos');
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching videos:', error);
-    return [];
-  }
+  const data = await fetchFromWorker<VideoData[]>('videos');
+  return (data && data.length > 0) ? data : defaultVideos;
 }
 
 export async function getVideosByCategory(category: string): Promise<VideoData[]> {
@@ -173,186 +105,46 @@ export async function getVideosByCategory(category: string): Promise<VideoData[]
   if (category === "Latest" || category === "latest") {
     return allVideos;
   }
-  return allVideos.filter(v => 
-    v.category?.toLowerCase() === category.toLowerCase()
-  );
+  return allVideos.filter(v => v.category?.toLowerCase() === category.toLowerCase());
 }
 
 export async function getTicker(): Promise<TickerItem[]> {
-  try {
-    const data = await callD1<TickerItem[]>('getTicker');
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching ticker:', error);
-    return [];
-  }
+  const data = await fetchFromWorker<TickerItem[]>('ticker');
+  return (data && data.length > 0) ? data : defaultTicker;
 }
 
 export async function getTvChannels(): Promise<TVChannel[]> {
-  try {
-    const data = await callD1<TVChannel[]>('getTvChannels');
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching tvChannels:', error);
-    return [];
-  }
+  const data = await fetchFromWorker<TVChannel[]>('tvChannels');
+  return (data && data.length > 0) ? data : defaultTvChannels;
 }
 
 export async function getElectionVisibility(): Promise<boolean> {
-  try {
-    const data = await callD1<boolean>('getElectionVisibility');
-    return data !== null && data !== undefined ? data : true;
-  } catch (error) {
-    console.error('Error fetching electionVisibility:', error);
-    return true;
-  }
+  const data = await fetchFromWorker<boolean>('electionVisible');
+  return data !== null ? data : true;
 }
 
 export async function getNoElectionMessage(): Promise<string> {
-  try {
-    const data = await callD1<string>('getNoElectionMessage');
-    return data || "No active elections at this time.";
-  } catch (error) {
-    console.error('Error fetching noElectionMessage:', error);
-    return "No active elections at this time.";
-  }
+  const data = await fetchFromWorker<string>('noElectionMessage');
+  return data || "No active elections at this time.";
 }
 
 export async function getFooterDescription(): Promise<string> {
-  try {
-    const data = await callD1<string>('getFooterDescription');
-    return data || footerData.description;
-  } catch (error) {
-    console.error('Error fetching footerDescription:', error);
-    return footerData.description;
-  }
+  const data = await fetchFromWorker<string>('footerDescription');
+  return data || defaultFooter.description;
 }
 
 export async function getSports(): Promise<SportItem[]> {
-  try {
-    const data = await callD1<SportItem[]>('getSports');
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching sports:', error);
-    return [];
-  }
+  const data = await fetchFromWorker<SportItem[]>('sports');
+  return (data && data.length > 0) ? data : defaultSports;
 }
 
 export async function getWeatherCities(): Promise<WeatherCity[]> {
-  try {
-    const data = await callD1<WeatherCity[]>('getWeatherCities');
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching weatherCities:', error);
-    return [];
-  }
+  const data = await fetchFromWorker<WeatherCity[]>('weatherCities');
+  return (data && data.length > 0) ? data : defaultWeatherCities;
 }
 
 // ============================================================
-// SOCIAL LINKS - Both names exported
-// ============================================================
-
-// Primary API function
-export async function getSocialLinksFromAPI(): Promise<{ platform: string; url: string }[]> {
-  try {
-    const data = await callD1<{ platform: string; url: string }[]>('getSocialLinks');
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching socialLinks:', error);
-    return [];
-  }
-}
-
-// Alias for admin panel - same function
-export async function getSocialLinks(): Promise<{ platform: string; url: string }[]> {
-  return getSocialLinksFromAPI();
-}
-
-// ============================================================
-// EXPORT STATIC DATA
-// ============================================================
-
-export { categories, languages, footerData, socialLinks };
-
-// ============================================================
-// SAVE FUNCTIONS
-// ============================================================
-
-export async function saveStory(data: any, type: 'top' | 'latest'): Promise<boolean> {
-  const action = type === 'top' ? 'saveTopStory' : 'saveLatestNews';
-  return saveToD1(action, data);
-}
-
-export async function deleteStory(id: string, type: 'top' | 'latest'): Promise<boolean> {
-  return saveToD1('deleteStory', { id, type });
-}
-
-export async function saveVideo(data: any): Promise<boolean> {
-  return saveToD1('saveVideo', data);
-}
-
-export async function deleteVideo(id: string): Promise<boolean> {
-  return saveToD1('deleteVideo', { id });
-}
-
-export async function saveTvChannel(data: any): Promise<boolean> {
-  return saveToD1('saveTvChannel', data);
-}
-
-export async function deleteTvChannel(id: string): Promise<boolean> {
-  return saveToD1('deleteTvChannel', { id });
-}
-
-export async function saveTicker(data: any): Promise<boolean> {
-  return saveToD1('saveTicker', data);
-}
-
-export async function deleteTicker(id: string): Promise<boolean> {
-  return saveToD1('deleteTicker', { id });
-}
-
-export async function saveElectionStates(data: any): Promise<boolean> {
-  return saveToD1('saveElectionStates', data);
-}
-
-export async function saveElectionConfig(data: any): Promise<boolean> {
-  return saveToD1('saveElectionConfig', data);
-}
-
-export async function toggleElectionVisibility(visible: boolean): Promise<boolean> {
-  return saveToD1('toggleElectionVisibility', { visible });
-}
-
-export async function saveNoElectionMessage(message: string): Promise<boolean> {
-  return saveToD1('saveNoElectionMessage', { message });
-}
-
-export async function saveMarketData(data: any): Promise<boolean> {
-  return saveToD1('saveMarketData', data);
-}
-
-export async function saveWeatherData(data: any): Promise<boolean> {
-  return saveToD1('saveWeatherData', data);
-}
-
-export async function saveWeatherCities(data: any): Promise<boolean> {
-  return saveToD1('saveWeatherCities', data);
-}
-
-export async function saveSports(data: any): Promise<boolean> {
-  return saveToD1('saveSports', data);
-}
-
-export async function saveFooterDescription(description: string): Promise<boolean> {
-  return saveToD1('saveFooterDescription', { description });
-}
-
-export async function saveSocialLinks(data: any): Promise<boolean> {
-  return saveToD1('saveSocialLinks', data);
-}
-
-// ============================================================
-// SEARCH
+// SEARCH – relevance‑based across all content
 // ============================================================
 
 export async function searchAllContent(query: string): Promise<any[]> {
@@ -361,62 +153,54 @@ export async function searchAllContent(query: string): Promise<any[]> {
   const searchTokens = query.trim().split(/\s+/).filter(t => t.length > 0);
   if (searchTokens.length === 0) return [];
 
-  const allItems: any[] = [];
+  const results: any[] = [];
 
+  // Helper: check if a field contains any token
   const fieldMatchesAnyToken = (fieldValue: string | undefined, tokens: string[]): boolean => {
     if (!fieldValue) return false;
     const lower = fieldValue.toLowerCase();
     return tokens.some(t => lower.includes(t.toLowerCase()));
   };
 
+  // Helper: check if a field contains ALL tokens (phrase match)
   const fieldMatchesAllTokens = (fieldValue: string | undefined, tokens: string[]): boolean => {
     if (!fieldValue) return false;
     const lower = fieldValue.toLowerCase();
     return tokens.every(t => lower.includes(t.toLowerCase()));
   };
 
+  // Helper: count token matches
   const countTokenMatches = (fieldValue: string | undefined, tokens: string[]): number => {
     if (!fieldValue) return 0;
     const lower = fieldValue.toLowerCase();
     return tokens.filter(t => lower.includes(t.toLowerCase())).length;
   };
 
+  // Helper: get best matching translation
   const getBestMatch = (item: any, field: string, tokens: string[]): string => {
-    if (fieldMatchesAnyToken(item[field], tokens)) {
-      return item[field] || '';
-    }
+    if (fieldMatchesAnyToken(item[field], tokens)) return item[field] || '';
     if (item.translations) {
-      const parsed = typeof item.translations === 'string' 
-        ? JSON.parse(item.translations) 
-        : item.translations;
-      if (parsed) {
-        for (const lang in parsed) {
-          const trans = parsed[lang];
-          if (trans && trans[field] && fieldMatchesAnyToken(trans[field], tokens)) {
-            return trans[field];
-          }
-        }
+      for (const lang in item.translations) {
+        const trans = item.translations[lang];
+        if (trans[field] && fieldMatchesAnyToken(trans[field], tokens)) return trans[field];
       }
     }
     return item[field] || '';
   };
 
+  // Helper: highly relevant if title contains all tokens
   const isHighlyRelevant = (item: any, tokens: string[]): boolean => {
     if (item.title && fieldMatchesAllTokens(item.title, tokens)) return true;
     if (item.translations) {
-      const parsed = typeof item.translations === 'string' 
-        ? JSON.parse(item.translations) 
-        : item.translations;
-      if (parsed) {
-        for (const lang in parsed) {
-          const trans = parsed[lang];
-          if (trans && trans.title && fieldMatchesAllTokens(trans.title, tokens)) return true;
-        }
+      for (const lang in item.translations) {
+        const trans = item.translations[lang];
+        if (trans.title && fieldMatchesAllTokens(trans.title, tokens)) return true;
       }
     }
     return false;
   };
 
+  // Calculate relevance score
   const calculateScore = (item: any, tokens: string[]): number => {
     let score = 0;
     const fields = ['title', 'category', 'description'];
@@ -432,33 +216,24 @@ export async function searchAllContent(query: string): Promise<any[]> {
     }
 
     if (item.translations) {
-      const parsed = typeof item.translations === 'string' 
-        ? JSON.parse(item.translations) 
-        : item.translations;
-      if (parsed) {
-        for (const lang in parsed) {
-          const trans = parsed[lang];
-          if (trans) {
-            for (const f of fields) {
-              const matches = countTokenMatches(trans[f], tokens);
-              if (f === 'title') {
-                if (trans.title && fieldMatchesAllTokens(trans.title, tokens)) score += 40;
-                score += matches * 8;
-              } else if (f === 'category') {
-                score += matches * 3;
-              } else {
-                score += matches * 1;
-              }
-            }
-          }
+      for (const lang in item.translations) {
+        const trans = item.translations[lang];
+        for (const f of fields) {
+          const matches = countTokenMatches(trans[f], tokens);
+          if (f === 'title') {
+            if (trans.title && fieldMatchesAllTokens(trans.title, tokens)) score += 40;
+            score += matches * 8;
+          } else if (f === 'category') score += matches * 3;
+          else score += matches * 1;
         }
       }
     }
-
     return score;
   };
 
-  // ----------- TOP STORIES -----------
+  const allItems: any[] = [];
+
+  // 1. Top Stories
   const top = await getTopStories();
   top.forEach(item => {
     const score = calculateScore(item, searchTokens);
@@ -475,7 +250,7 @@ export async function searchAllContent(query: string): Promise<any[]> {
     }
   });
 
-  // ----------- LATEST NEWS -----------
+  // 2. Latest News
   const latest = await getLatestNews();
   latest.forEach(item => {
     const score = calculateScore(item, searchTokens);
@@ -492,7 +267,7 @@ export async function searchAllContent(query: string): Promise<any[]> {
     }
   });
 
-  // ----------- VIDEOS -----------
+  // 3. Videos
   const videos = await getVideos();
   videos.forEach(v => {
     const score = calculateScore(v, searchTokens);
@@ -504,38 +279,40 @@ export async function searchAllContent(query: string): Promise<any[]> {
         _isExact: isHighlyRelevant(v, searchTokens),
         _title: getBestMatch(v, 'title', searchTokens) || v.title,
         _category: getBestMatch(v, 'category', searchTokens) || v.category || 'Video',
-        _description: getBestMatch(v, 'title', searchTokens) || v.title,
+        _description: `▶️ ${getBestMatch(v, 'title', searchTokens) || v.title}`,
         time: 'Now',
         link: v.link || '#',
       });
     }
   });
 
-  // ----------- SPORTS -----------
+  // 4. Sports
   const sports = await getSports();
   sports.forEach(s => {
     const score = calculateScore(s, searchTokens);
     if (score > 0) {
-      const sportId = s.id ? `sport-${s.id}` : `sport-${s.sport}`;
+      const sportName = getBestMatch(s, 'sport', searchTokens) || s.sport;
+      const matchName = getBestMatch(s, 'match', searchTokens) || s.match;
+      const detailName = getBestMatch(s, 'detail', searchTokens) || s.detail;
       allItems.push({
-        id: sportId,
-        title: `⚽ ${s.sport}: ${s.match}`,
+        id: `sport-${s.sport}`,
+        title: `⚽ ${sportName}: ${matchName}`,
         category: 'Sports',
         time: 'Live',
         image: 'https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&q=80&w=400',
         link: '#',
-        description: `${s.score} • ${s.detail}`,
+        description: `${s.score} • ${detailName}`,
         type: 'live',
         _score: score,
         _isExact: isHighlyRelevant(s, searchTokens),
-        _title: `⚽ ${s.sport}: ${s.match}`,
+        _title: `⚽ ${sportName}: ${matchName}`,
         _category: 'Sports',
-        _description: `${s.score} • ${s.detail}`,
+        _description: `${s.score} • ${detailName}`,
       });
     }
   });
 
-  // ----------- CRICKET -----------
+  // 5. Cricket
   const cricket = await getCricket();
   if (cricket.match) {
     const score = calculateScore(cricket, searchTokens);
@@ -558,7 +335,7 @@ export async function searchAllContent(query: string): Promise<any[]> {
     }
   }
 
-  // ----------- WEATHER -----------
+  // 6. Weather
   const weather = await getWeather();
   if (weather.city || weather.condition) {
     const score = calculateScore(weather, searchTokens);
@@ -581,7 +358,7 @@ export async function searchAllContent(query: string): Promise<any[]> {
     }
   }
 
-  // ----------- WEATHER CITIES -----------
+  // 7. Weather Cities
   const weatherCities = await getWeatherCities();
   weatherCities.forEach(c => {
     const score = calculateScore(c, searchTokens);
@@ -604,7 +381,7 @@ export async function searchAllContent(query: string): Promise<any[]> {
     }
   });
 
-  // ----------- MARKET -----------
+  // 8. Market
   const market = await getMarket();
   if (market) {
     const marketScore = calculateScore(market, searchTokens);
@@ -620,14 +397,14 @@ export async function searchAllContent(query: string): Promise<any[]> {
         type: 'live',
         _score: marketScore,
         _isExact: false,
-        _title: `💰 Market Update`,
+        _title: '💰 Market Update',
         _category: 'Business',
         _description: `Sensex: ${market.sensex || 'N/A'} | Nifty: ${market.nifty || 'N/A'} | Gold: ₹${market.goldRate}`,
       });
     }
   }
 
-  // ----------- TICKER -----------
+  // 9. Ticker items
   const ticker = await getTicker();
   ticker.forEach(t => {
     if (fieldMatchesAnyToken(t.text, searchTokens)) {
@@ -649,7 +426,7 @@ export async function searchAllContent(query: string): Promise<any[]> {
     }
   });
 
-  // ----------- DEDUPLICATE -----------
+  // Remove duplicates
   const seen = new Set();
   const unique = allItems.filter(r => {
     const key = r.id + r.type;
@@ -658,14 +435,17 @@ export async function searchAllContent(query: string): Promise<any[]> {
     return true;
   });
 
-  // ----------- SORT -----------
+  // Sort: exact matches first, then score, then articles
   unique.sort((a, b) => {
     if (a._isExact && !b._isExact) return -1;
     if (b._isExact && !a._isExact) return 1;
-    return (b._score || 0) - (a._score || 0);
+    if (a._score !== b._score) return (b._score || 0) - (a._score || 0);
+    if (a.type === 'article' && b.type !== 'article') return -1;
+    if (b.type === 'article' && a.type !== 'article') return 1;
+    return 0;
   });
 
-  // ----------- FORMAT RESULTS -----------
+  // Map to final structure
   const finalResults = unique.map(item => ({
     id: item.id,
     title: item._title || item.title,
@@ -679,17 +459,17 @@ export async function searchAllContent(query: string): Promise<any[]> {
     _isExact: item._isExact || false,
   }));
 
-  const MIN_SCORE = 3;
-  const filtered = finalResults.filter(r => (r._score || 0) >= MIN_SCORE);
-
-  const exactMatches = filtered.filter(r => r._isExact);
-  const nonExactMatches = filtered.filter(r => !r._isExact);
+  // Filter by relevance threshold
+  const exactMatches = finalResults.filter(r => r._isExact);
+  const nonExactMatches = finalResults.filter(r => !r._isExact);
+  const MIN_SCORE = 5;
+  const filteredNonExact = nonExactMatches.filter(r => (r._score || 0) >= MIN_SCORE);
 
   let final: any[] = [];
   if (exactMatches.length > 0) {
-    final = [...exactMatches, ...nonExactMatches];
+    final = [...exactMatches, ...filteredNonExact];
   } else {
-    final = filtered;
+    final = finalResults.filter(r => (r._score || 0) >= MIN_SCORE);
   }
 
   if (final.length === 0 && finalResults.length > 0) {

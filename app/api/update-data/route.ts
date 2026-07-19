@@ -1,7 +1,5 @@
 // app/api/update-data/route.ts
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 
 export async function POST(request: Request) {
   try {
@@ -9,36 +7,31 @@ export async function POST(request: Request) {
     const { section, data } = body;
 
     if (!section || data === undefined) {
-      return NextResponse.json({ error: 'Section and data are required' }, { status: 400 });
+      return NextResponse.json({ error: 'section and data required' }, { status: 400 });
     }
 
-    // Path to the JSON file
-    const jsonPath = path.join(process.cwd(), 'app', 'data', 'content.json');
+    // TEMPORARY: Hardcode for testing
+    const workerUrl = 'https://news-api.unsung.workers.dev';
+    const secret = 'your-very-strong-secret-key';
 
-    // Read existing JSON
-    let jsonData: any = {};
-    try {
-      const jsonContent = fs.readFileSync(jsonPath, 'utf8');
-      jsonData = JSON.parse(jsonContent);
-    } catch (e) {
-      // File doesn't exist, start with empty
-    }
-
-    // Update the section
-    jsonData[section] = data;
-
-    // Write back to JSON
-    fs.writeFileSync(jsonPath, JSON.stringify(jsonData, null, 2));
-
-    return NextResponse.json({
-      success: true,
-      message: `${section} updated successfully`
+    const response = await fetch(`${workerUrl}/api/update-data`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Key': secret,
+      },
+      body: JSON.stringify({ section, data }),
     });
 
+    const result = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json({ error: result.error || 'Worker error' }, { status: response.status });
+    }
+
+    return NextResponse.json(result);
   } catch (error: any) {
-    console.error('Update error:', error);
-    return NextResponse.json({
-      error: error.message || 'Failed to update data'
-    }, { status: 500 });
+    console.error('Proxy error:', error.message);
+    return NextResponse.json({ error: 'Proxy error: ' + error.message }, { status: 500 });
   }
 }

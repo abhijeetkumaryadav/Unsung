@@ -1,14 +1,13 @@
-// app/admin/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { 
-  Lock, ArrowLeft, RefreshCw, Newspaper, 
-  Tv, LineChart, Vote, CloudSun, Coins, Layers, Play, 
-  Tag, Trash2, Edit2, Save, X, Plus, Home, 
+import {
+  Lock, ArrowLeft, RefreshCw, Newspaper,
+  Tv, LineChart, Vote, CloudSun, Coins, Layers, Play,
+  Tag, Trash2, Edit2, Save, X, Plus, Home,
   Trophy, DollarSign, Image as ImageIcon,
-  Upload, Globe, Radio, Zap, 
+  Upload, Globe, Radio, Zap,
   TrendingUp, TrendingDown, Languages,
   Check, Video, Activity,
   PlusCircle, MinusCircle
@@ -29,30 +28,9 @@ import {
   getFooterDescription,
   getSports,
   getWeatherCities,
-  getSocialLinks,
-  saveStory,
-  deleteStory,
-  saveVideo,
-  deleteVideo,
-  saveTvChannel,
-  deleteTvChannel,
-  saveTicker,
-  deleteTicker,
-  saveElectionStates,
-  saveElectionConfig,
-  toggleElectionVisibility,
-  saveNoElectionMessage,
-  saveMarketData,
-  saveWeatherData,
-  saveWeatherCities,
-  saveSports,
-  saveFooterDescription,
-  saveSocialLinks
+  saveToWorker,
 } from "@/app/lib/dataService";
-
-// ============================================================
-// CONSTANTS
-// ============================================================
+import { useTheme } from "@/app/context/ThemeContext";
 
 const ALL_CATEGORIES = [
   "Latest",
@@ -100,16 +78,8 @@ interface ElectionState {
   [key: string]: any;
 }
 
-const fillColorMap: Record<string, string> = {
-  orange: "#f97316", red: "#dc2626", sky: "#0ea5e9", slate: "#64748b",
-  green: "#10b981", purple: "#8b5cf6", yellow: "#eab308", pink: "#ec4899", blue: "#3b82f6",
-};
-
-// ============================================================
-// MAIN ADMIN PANEL COMPONENT
-// ============================================================
-
 export default function AdminPanel() {
+  const { isDark } = useTheme();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -123,9 +93,9 @@ export default function AdminPanel() {
   const [topStories, setTopStoriesState] = useState<any[]>([]);
   const [latestNews, setLatestNewsState] = useState<any[]>([]);
   const [cricket, setCricketState] = useState<any>({ match: "", score: "", overs: "" });
-  const [market, setMarketState] = useState<any>({ 
+  const [market, setMarketState] = useState<any>({
     usdInr: "", usdInrChange: "", goldRate: "", goldChange: "",
-    sensex: "", sensexChange: "", nifty: "", niftyChange: "" 
+    sensex: "", sensexChange: "", nifty: "", niftyChange: ""
   });
   const [weather, setWeatherState] = useState<any>({ temp: "", city: "", condition: "" });
   const [weatherCities, setWeatherCitiesState] = useState<any[]>([]);
@@ -140,10 +110,8 @@ export default function AdminPanel() {
   const [footerDesc, setFooterDesc] = useState("");
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
 
-  // Dashboard language filter
   const [dashboardLangFilter, setDashboardLangFilter] = useState("all");
 
-  // Edit states
   const [editingNews, setEditingNews] = useState<any>(null);
   const [newsForm, setNewsForm] = useState({
     title: "",
@@ -156,7 +124,7 @@ export default function AdminPanel() {
     translations: {} as Record<string, { title: string; description: string }>
   });
   const [newsType, setNewsType] = useState("latest");
-  
+
   const [editingTranslation, setEditingTranslation] = useState<{ lang: string; title: string; description: string } | null>(null);
 
   const [editingVideo, setEditingVideo] = useState<any>(null);
@@ -171,9 +139,9 @@ export default function AdminPanel() {
   });
 
   const [editingChannel, setEditingChannel] = useState<any>(null);
-  const [channelForm, setChannelForm] = useState({ 
-    name: "", 
-    logo: "", 
+  const [channelForm, setChannelForm] = useState({
+    name: "",
+    logo: "",
     urls: [""] as string[],
     type: "youtube" as "youtube" | "hls" | "iframe",
     language: "en",
@@ -191,7 +159,7 @@ export default function AdminPanel() {
     translations: {} as Record<string, { text: string }>
   });
   const [newTickerText, setNewTickerText] = useState("");
-  
+
   const [tickerLinkLang, setTickerLinkLang] = useState("en");
   const [tickerLinkCat, setTickerLinkCat] = useState("");
 
@@ -203,19 +171,25 @@ export default function AdminPanel() {
   const [videoExtractLoading, setVideoExtractLoading] = useState(false);
   const [isTranslatingNews, setIsTranslatingNews] = useState(false);
 
-  // ============================================================
-  // EFFECTS
-  // ============================================================
+  const fillColorMap: Record<string, string> = {
+    orange: "#f97316", red: "#dc2626", sky: "#0ea5e9", slate: "#64748b",
+    green: "#10b981", purple: "#8b5cf6", yellow: "#eab308", pink: "#ec4899", blue: "#3b82f6",
+  };
+
+  // Dark mode colors
+  const darkBg = '#1a1a1a';
+  const darkCardBg = '#242424';
+  const darkBorder = '#333333';
+  const darkText = '#e8e8e8';
+  const darkTextSecondary = '#a0a0a0';
+  const darkTextMuted = '#888888';
+  const darkHover = '#2d2d2d';
 
   useEffect(() => {
     if (isAuthenticated) {
       loadAllData();
     }
   }, [isAuthenticated]);
-
-  // ============================================================
-  // HELPER FUNCTIONS
-  // ============================================================
 
   const countByLanguage = (items: any[], lang: string) => {
     return items.filter(item => item.language === lang).length;
@@ -225,27 +199,10 @@ export default function AdminPanel() {
     return items.filter(item => !item.language).length;
   };
 
-  const showMessage = (msg: string) => {
-    setSavedMessage(msg);
-    setTimeout(() => setSavedMessage(""), 4000);
-  };
-
-  const detectStreamType = (url: string): "youtube" | "hls" | "iframe" => {
-    if (!url) return "iframe";
-    const lower = url.toLowerCase();
-    if (lower.includes("youtube.com") || lower.includes("youtu.be")) return "youtube";
-    if (lower.includes(".m3u8")) return "hls";
-    return "iframe";
-  };
-
-  // ============================================================
-  // LOAD DATA
-  // ============================================================
-
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [top, latest, crick, mark, weath, electStates, electConfig, vid, tick, channels, vis, msg, footer, sp, wc, social] = await Promise.all([
+      const [top, latest, crick, mark, weath, electStates, electConfig, vid, tick, channels, vis, msg, footer, sp, wc] = await Promise.all([
         getTopStories(),
         getLatestNews(),
         getCricket(),
@@ -260,16 +217,14 @@ export default function AdminPanel() {
         getNoElectionMessage(),
         getFooterDescription(),
         getSports(),
-        getWeatherCities(),
-        getSocialLinks()
+        getWeatherCities()
       ]);
-      
       setTopStoriesState(top);
       setLatestNewsState(latest);
       setCricketState(crick);
       setMarketState(mark);
       setWeatherState(weath);
-      
+
       let loadedStates = electStates || [];
       loadedStates = loadedStates.map((state: any) => {
         if (!state.parties || !Array.isArray(state.parties) || state.parties.length === 0) {
@@ -286,7 +241,7 @@ export default function AdminPanel() {
         return state;
       });
       setElectionStatesState(loadedStates as any as ElectionState[]);
-      
+
       setElectionConfigState(electConfig);
       setVideosState(vid);
       setTickerState(tick);
@@ -296,8 +251,30 @@ export default function AdminPanel() {
       setFooterDesc(footer);
       setSportsState(sp);
       setWeatherCitiesState(wc);
-      setSocialLinks(social || []);
-      
+
+      try {
+        const response = await fetch('/api/get-data?key=socialLinks&t=' + Date.now());
+        if (response.ok) {
+          const data = await response.json();
+          if (data && Array.isArray(data)) {
+            setSocialLinks(data);
+          } else {
+            setSocialLinks([
+              { platform: "YouTube", url: "https://www.youtube.com/@Unsung-v2l" },
+              { platform: "Facebook", url: "#" },
+              { platform: "X (Twitter)", url: "#" },
+              { platform: "Instagram", url: "#" }
+            ]);
+          }
+        }
+      } catch {
+        setSocialLinks([
+          { platform: "YouTube", url: "https://www.youtube.com/@Unsung-v2l" },
+          { platform: "Facebook", url: "#" },
+          { platform: "X (Twitter)", url: "#" },
+          { platform: "Instagram", url: "#" }
+        ]);
+      }
     } catch (error) {
       console.error('Load error:', error);
       showMessage('Failed to load data');
@@ -305,17 +282,9 @@ export default function AdminPanel() {
     setLoading(false);
   };
 
-  // ============================================================
-  // AUTHENTICATION - Using Environment Variables
-  // ============================================================
-
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Get credentials from environment variables with fallback
-    const adminUser = process.env.ADMIN_USERNAME || "admin";
-    const adminPass = process.env.ADMIN_PASSWORD || "kalavathi devi";
-    
-    if (username === adminUser && password === adminPass) {
+    if (username === "admin" && password === "kalavathi devi") {
       setIsAuthenticated(true);
       setAuthError("");
       loadAllData();
@@ -330,9 +299,10 @@ export default function AdminPanel() {
     setPassword("");
   };
 
-  // ============================================================
-  // TRANSLATION FUNCTIONS
-  // ============================================================
+  const showMessage = (msg: string) => {
+    setSavedMessage(msg);
+    setTimeout(() => setSavedMessage(""), 4000);
+  };
 
   const handleTranslate = async (text: string, targetLang: string, sourceLang?: string): Promise<string> => {
     if (!text.trim()) return text;
@@ -352,6 +322,14 @@ export default function AdminPanel() {
     } finally {
       setTranslating(false);
     }
+  };
+
+  const detectStreamType = (url: string): "youtube" | "hls" | "iframe" => {
+    if (!url) return "iframe";
+    const lower = url.toLowerCase();
+    if (lower.includes("youtube.com") || lower.includes("youtu.be")) return "youtube";
+    if (lower.includes(".m3u8")) return "hls";
+    return "iframe";
   };
 
   const handleTranslateNews = async () => {
@@ -418,19 +396,11 @@ export default function AdminPanel() {
     showMessage(`Removed ${LANGUAGES.find(l => l.code === lang)?.nativeName || lang} translation`);
   };
 
-  // ============================================================
-  // ARTICLE EXTRACTION
-  // ============================================================
-
   const extractVideoTitle = async () => {
     if (!videoForm.link.trim()) { showMessage('Please enter a video URL first.'); return; }
     setVideoExtractLoading(true);
     try {
-      const response = await fetch('/api/extract', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ url: videoForm.link }) 
-      });
+      const response = await fetch('/api/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: videoForm.link }) });
       const data = await response.json();
       if (data.title) {
         setVideoForm({ ...videoForm, title: data.title });
@@ -438,9 +408,7 @@ export default function AdminPanel() {
       } else {
         showMessage('Could not extract title. Please enter manually.');
       }
-    } catch (error) { 
-      showMessage('Failed to extract title.'); 
-    }
+    } catch (error) { showMessage('Failed to extract title.'); }
     setVideoExtractLoading(false);
   };
 
@@ -448,91 +416,56 @@ export default function AdminPanel() {
     if (!extractUrl.trim()) return;
     setExtracting(true);
     try {
-      const response = await fetch("/api/extract", { 
-        method: "POST", 
-        headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify({ url: extractUrl }) 
-      });
+      const response = await fetch("/api/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: extractUrl }) });
       const data = await response.json();
-      if (data.error) { 
-        showMessage(data.error); 
-      } else {
+      if (data.error) { showMessage(data.error); }
+      else {
         const newsId = `auto-${Date.now()}`;
         setExtractedData(data);
         setNewsForm({
-          title: data.title || "", 
-          category: "India", 
-          image: data.image || "",
-          link: `/news/${newsId}`, 
-          description: data.content || data.description || "",
-          language: extractedLang, 
-          featuredInAll: false, 
-          translations: {}
+          title: data.title || "", category: "India", image: data.image || "",
+          link: `/news/${newsId}`, description: data.content || data.description || "",
+          language: extractedLang, featuredInAll: false, translations: {}
         });
         showMessage(`✅ Extracted! Language: ${LANGUAGES.find(l => l.code === extractedLang)?.nativeName}.`);
       }
-    } catch (error) { 
-      showMessage("Extraction failed!"); 
-    }
+    } catch (error) { showMessage("Extraction failed!"); }
     setExtracting(false);
   };
 
-  // ============================================================
-  // NEWS (STORIES) FUNCTIONS
-  // ============================================================
-
-  const resetNewsForm = () => {
-    setEditingNews(null); 
-    setExtractedData(null); 
-    setEditingTranslation(null);
-    setNewsForm({ 
-      title: "", 
-      category: "India", 
-      image: "", 
-      link: "", 
-      description: "", 
-      language: "en", 
-      featuredInAll: false, 
-      translations: {} 
-    });
+  const saveSection = async (section: string, data: any, successMsg: string) => {
+    setLoading(true);
+    const success = await saveToWorker(section, data);
+    if (success) showMessage(successMsg);
+    else showMessage('Failed to save!');
+    setLoading(false);
+    return success;
   };
 
   const handleAddNews = async () => {
     if (!newsForm.title.trim()) return;
     const newsId = `auto-${Date.now()}`;
     const entry = {
-      id: newsId, 
-      title: newsForm.title, 
-      category: newsForm.category,
-      time: "Just now", 
-      image: newsForm.image || "https://images.unsplash.com/photo-1504370805625-d32c54b16100?auto=format&fit=crop&q=80&w=300",
-      link: `/news/${newsId}`, 
-      description: newsForm.description || "",
-      language: newsForm.language, 
-      featuredInAll: newsForm.featuredInAll,
+      id: newsId, title: newsForm.title, category: newsForm.category,
+      time: "Just now", image: newsForm.image || "https://images.unsplash.com/photo-1504370805625-d32c54b16100?auto=format&fit=crop&q=80&w=300",
+      link: `/news/${newsId}`, description: newsForm.description || "",
+      language: newsForm.language, featuredInAll: newsForm.featuredInAll,
       translations: newsForm.translations || {}
     };
-    if (newsType === "top") { 
-      setTopStoriesState([entry, ...topStories]); 
-    } else { 
-      setLatestNewsState([entry, ...latestNews]); 
-    }
-    await saveStory(entry, newsType === "top" ? 'top' : 'latest');
-    showMessage("✅ Story added!");
+    let updated;
+    if (newsType === "top") { updated = [entry, ...topStories]; setTopStoriesState(updated); }
+    else { updated = [entry, ...latestNews]; setLatestNewsState(updated); }
+    const section = newsType === "top" ? "topStories" : "latestNews";
+    await saveSection(section, updated, "Story added!");
     resetNewsForm();
   };
 
   const handleEditNews = (item: any, type: string) => {
-    setEditingNews(item); 
-    setNewsType(type);
+    setEditingNews(item); setNewsType(type);
     setNewsForm({
-      title: item.title || "", 
-      category: item.category || "India", 
-      image: item.image || "",
-      link: item.link || "", 
-      description: item.description || "",
-      language: item.language || "en", 
-      featuredInAll: item.featuredInAll || false,
+      title: item.title || "", category: item.category || "India", image: item.image || "",
+      link: item.link || "", description: item.description || "",
+      language: item.language || "en", featuredInAll: item.featuredInAll || false,
       translations: item.translations || {}
     });
   };
@@ -540,86 +473,53 @@ export default function AdminPanel() {
   const handleUpdateNews = async () => {
     if (!editingNews) return;
     const updates = {
-      id: editingNews.id,
-      title: newsForm.title, 
-      category: newsForm.category, 
-      image: newsForm.image,
-      link: newsForm.link || `/news/${editingNews.id}`, 
-      description: newsForm.description,
-      language: newsForm.language, 
-      featuredInAll: newsForm.featuredInAll,
+      title: newsForm.title, category: newsForm.category, image: newsForm.image,
+      link: newsForm.link || `/news/${editingNews.id}`, description: newsForm.description,
+      language: newsForm.language, featuredInAll: newsForm.featuredInAll,
       translations: newsForm.translations
     };
-    if (newsType === "top") { 
-      const updated = topStories.map((s: any) => s.id === editingNews.id ? { ...s, ...updates } : s); 
-      setTopStoriesState(updated); 
-    } else { 
-      const updated = latestNews.map((s: any) => s.id === editingNews.id ? { ...s, ...updates } : s); 
-      setLatestNewsState(updated); 
-    }
-    await saveStory(updates, newsType === "top" ? 'top' : 'latest');
-    showMessage("✅ Story updated!");
+    let updated;
+    if (newsType === "top") { updated = topStories.map((s: any) => s.id === editingNews.id ? { ...s, ...updates } : s); setTopStoriesState(updated); }
+    else { updated = latestNews.map((s: any) => s.id === editingNews.id ? { ...s, ...updates } : s); setLatestNewsState(updated); }
+    const section = newsType === "top" ? "topStories" : "latestNews";
+    await saveSection(section, updated, "Story updated!");
     resetNewsForm();
   };
 
   const handleDeleteNews = async (id: string, type: string) => {
     if (!confirm("Delete this story?")) return;
-    if (type === "top") { 
-      const updated = topStories.filter((s: any) => s.id !== id); 
-      setTopStoriesState(updated); 
-    } else { 
-      const updated = latestNews.filter((s: any) => s.id !== id); 
-      setLatestNewsState(updated); 
-    }
-    await deleteStory(id, type as 'top' | 'latest');
-    showMessage("✅ Story deleted!");
+    let updated;
+    if (type === "top") { updated = topStories.filter((s: any) => s.id !== id); setTopStoriesState(updated); }
+    else { updated = latestNews.filter((s: any) => s.id !== id); setLatestNewsState(updated); }
+    const section = type === "top" ? "topStories" : "latestNews";
+    await saveSection(section, updated, "Story deleted!");
   };
 
-  // ============================================================
-  // VIDEO FUNCTIONS
-  // ============================================================
-
-  const resetVideoForm = () => {
-    setEditingVideo(null);
-    setVideoForm({ 
-      title: "", 
-      img: "", 
-      link: "", 
-      category: "Latest", 
-      language: "en", 
-      featuredInAll: false, 
-      translations: {} 
-    });
+  const resetNewsForm = () => {
+    setEditingNews(null); setExtractedData(null); setEditingTranslation(null);
+    setNewsForm({ title: "", category: "India", image: "", link: "", description: "", language: "en", featuredInAll: false, translations: {} });
   };
 
   const handleAddVideo = async () => {
     if (!videoForm.title.trim() || !videoForm.link.trim()) return;
     const entry = {
-      id: `vid-${Date.now()}`, 
-      title: videoForm.title,
+      id: `vid-${Date.now()}`, title: videoForm.title,
       img: videoForm.img || "https://images.unsplash.com/photo-1504370805625-d32c54b16100?auto=format&fit=crop&q=80&w=300",
-      link: videoForm.link, 
-      category: videoForm.category || "Latest",
-      language: videoForm.language, 
-      featuredInAll: videoForm.featuredInAll,
+      link: videoForm.link, category: videoForm.category || "Latest",
+      language: videoForm.language, featuredInAll: videoForm.featuredInAll,
       translations: videoForm.translations || {}
     };
-    setVideosState([...videos, entry]);
-    await saveVideo(entry);
-    showMessage("✅ Video added!");
+    const updated = [...videos, entry]; setVideosState(updated);
+    await saveSection("videos", updated, "Video added!");
     resetVideoForm();
   };
 
   const handleEditVideo = (item: any) => {
     setEditingVideo(item);
     setVideoForm({
-      title: item.title || "", 
-      img: item.img || "", 
-      link: item.link || "",
-      category: item.category || "Latest", 
-      language: item.language || "en",
-      featuredInAll: item.featuredInAll || false, 
-      translations: item.translations || {}
+      title: item.title || "", img: item.img || "", link: item.link || "",
+      category: item.category || "Latest", language: item.language || "en",
+      featuredInAll: item.featuredInAll || false, translations: item.translations || {}
     });
   };
 
@@ -627,279 +527,133 @@ export default function AdminPanel() {
     if (!editingVideo) return;
     const updated = videos.map((v: any) => v.id === editingVideo.id ? { ...v, ...videoForm } : v);
     setVideosState(updated);
-    await saveVideo({ ...videoForm, id: editingVideo.id });
-    showMessage("✅ Video updated!");
+    await saveSection("videos", updated, "Video updated!");
     resetVideoForm();
   };
 
   const handleDeleteVideo = async (id: string) => {
     if (!confirm("Delete this video?")) return;
-    const updated = videos.filter((v: any) => v.id !== id); 
-    setVideosState(updated);
-    await deleteVideo(id);
-    showMessage("✅ Video deleted!");
+    const updated = videos.filter((v: any) => v.id !== id); setVideosState(updated);
+    await saveSection("videos", updated, "Video deleted!");
   };
 
-  // ============================================================
-  // TV CHANNEL FUNCTIONS
-  // ============================================================
-
-  const resetChannelForm = () => {
-    setEditingChannel(null);
-    setChannelForm({ 
-      name: "", 
-      logo: "", 
-      urls: [""], 
-      type: "youtube", 
-      language: "en", 
-      featuredInAll: false, 
-      translations: {} 
-    });
-  };
-
-  const addChannelUrl = () => { 
-    setChannelForm({ ...channelForm, urls: [...channelForm.urls, ""] }); 
-  };
-
-  const removeChannelUrl = (index: number) => {
-    if (channelForm.urls.length <= 1) { 
-      showMessage("At least one URL is required."); 
-      return; 
-    }
-    const newUrls = channelForm.urls.filter((_, i) => i !== index);
-    setChannelForm({ ...channelForm, urls: newUrls });
-  };
-
-  const updateChannelUrl = (index: number, value: string) => {
-    const newUrls = [...channelForm.urls]; 
-    newUrls[index] = value;
-    setChannelForm({ 
-      ...channelForm, 
-      urls: newUrls, 
-      type: index === 0 ? detectStreamType(value) : channelForm.type 
-    });
+  const resetVideoForm = () => {
+    setEditingVideo(null);
+    setVideoForm({ title: "", img: "", link: "", category: "Latest", language: "en", featuredInAll: false, translations: {} });
   };
 
   const handleAddChannel = async () => {
     if (!channelForm.name.trim() || !channelForm.urls[0]?.trim()) return;
     const validUrls = channelForm.urls.filter(u => u.trim());
-    if (validUrls.length === 0) { 
-      showMessage("Please add at least one URL."); 
-      return; 
-    }
+    if (validUrls.length === 0) { showMessage("Please add at least one URL."); return; }
     const detectedType = detectStreamType(validUrls[0]);
     const entry = {
-      id: `ch-${Date.now()}`, 
-      name: channelForm.name,
+      id: `ch-${Date.now()}`, name: channelForm.name,
       logo: channelForm.logo || channelForm.name.substring(0, 2).toUpperCase(),
-      urls: validUrls, 
-      type: channelForm.type || detectedType,
-      language: channelForm.language, 
-      featuredInAll: channelForm.featuredInAll,
+      urls: validUrls, type: channelForm.type || detectedType,
+      language: channelForm.language, featuredInAll: channelForm.featuredInAll,
       translations: channelForm.translations || {}
     };
-    setTvChannelsState([...tvChannels, entry]);
-    await saveTvChannel(entry);
-    showMessage("✅ Channel added!");
+    const updated = [...tvChannels, entry]; setTvChannelsState(updated);
+    await saveSection("tvChannels", updated, "Channel added!");
     resetChannelForm();
   };
 
   const handleEditChannel = (item: any) => {
     setEditingChannel(item);
     setChannelForm({
-      name: item.name || "", 
-      logo: item.logo || "",
+      name: item.name || "", logo: item.logo || "",
       urls: item.urls && item.urls.length > 0 ? [...item.urls] : [item.embedUrl || ""],
-      type: item.type || "youtube", 
-      language: item.language || "en",
-      featuredInAll: item.featuredInAll || false, 
-      translations: item.translations || {}
+      type: item.type || "youtube", language: item.language || "en",
+      featuredInAll: item.featuredInAll || false, translations: item.translations || {}
     });
   };
 
   const handleUpdateChannel = async () => {
     if (!editingChannel) return;
     const validUrls = channelForm.urls.filter(u => u.trim());
-    if (validUrls.length === 0) { 
-      showMessage("Please add at least one URL."); 
-      return; 
-    }
+    if (validUrls.length === 0) { showMessage("Please add at least one URL."); return; }
     const detectedType = detectStreamType(validUrls[0]);
-    const updated = tvChannels.map((c: any) => 
-      c.id === editingChannel.id ? { 
-        ...c, 
-        name: channelForm.name, 
-        urls: validUrls, 
-        logo: channelForm.logo, 
-        type: channelForm.type || detectedType, 
-        language: channelForm.language, 
-        featuredInAll: channelForm.featuredInAll, 
-        translations: channelForm.translations 
-      } : c
-    );
+    const updated = tvChannels.map((c: any) => c.id === editingChannel.id ? { ...c, name: channelForm.name, urls: validUrls, logo: channelForm.logo, type: channelForm.type || detectedType, language: channelForm.language, featuredInAll: channelForm.featuredInAll, translations: channelForm.translations } : c);
     setTvChannelsState(updated);
-    await saveTvChannel({ 
-      id: editingChannel.id, 
-      ...channelForm, 
-      urls: validUrls, 
-      type: channelForm.type || detectedType 
-    });
-    showMessage("✅ Channel updated!");
+    await saveSection("tvChannels", updated, "Channel updated!");
     resetChannelForm();
   };
 
   const handleDeleteChannel = async (id: string) => {
     if (!confirm("Delete this channel?")) return;
-    const updated = tvChannels.filter((c: any) => c.id !== id); 
-    setTvChannelsState(updated);
-    await deleteTvChannel(id);
-    showMessage("✅ Channel deleted!");
+    const updated = tvChannels.filter((c: any) => c.id !== id); setTvChannelsState(updated);
+    await saveSection("tvChannels", updated, "Channel deleted!");
   };
 
-  // ============================================================
-  // TICKER FUNCTIONS
-  // ============================================================
-
-  const resetTickerForm = () => {
-    setEditingTicker(null);
-    setTickerForm({ 
-      text: "", 
-      active: true, 
-      linkedStories: [], 
-      linkedLatest: [], 
-      linkedVideos: [], 
-      translations: {} 
-    });
+  const addChannelUrl = () => { setChannelForm({ ...channelForm, urls: [...channelForm.urls, ""] }); };
+  const removeChannelUrl = (index: number) => {
+    if (channelForm.urls.length <= 1) { showMessage("At least one URL is required."); return; }
+    const newUrls = channelForm.urls.filter((_, i) => i !== index);
+    setChannelForm({ ...channelForm, urls: newUrls });
+  };
+  const updateChannelUrl = (index: number, value: string) => {
+    const newUrls = [...channelForm.urls]; newUrls[index] = value;
+    setChannelForm({ ...channelForm, urls: newUrls, type: index === 0 ? detectStreamType(value) : channelForm.type });
+  };
+  const resetChannelForm = () => {
+    setEditingChannel(null);
+    setChannelForm({ name: "", logo: "", urls: [""], type: "youtube", language: "en", featuredInAll: false, translations: {} });
   };
 
   const handleAddTicker = async () => {
     if (!newTickerText.trim()) return;
-    const entry = { 
-      id: `tick-${Date.now()}`, 
-      text: newTickerText, 
-      active: true, 
-      linkedStories: [], 
-      linkedLatest: [], 
-      linkedVideos: [], 
-      translations: {} 
-    };
-    setTickerState([...ticker, entry]);
-    await saveTicker(entry);
-    showMessage("✅ Ticker added!");
+    const entry = { id: `tick-${Date.now()}`, text: newTickerText, active: true, linkedStories: [], linkedLatest: [], linkedVideos: [], translations: {} };
+    const updated = [...ticker, entry]; setTickerState(updated);
+    await saveSection("ticker", updated, "Ticker added!");
     setNewTickerText("");
   };
 
   const handleEditTicker = (item: any) => {
     setEditingTicker(item);
-    setTickerForm({ 
-      text: item.text || "", 
-      active: item.active !== false, 
-      linkedStories: item.linkedStories || [], 
-      linkedLatest: item.linkedLatest || [], 
-      linkedVideos: item.linkedVideos || [], 
-      translations: item.translations || {} 
-    });
+    setTickerForm({ text: item.text || "", active: item.active !== false, linkedStories: item.linkedStories || [], linkedLatest: item.linkedLatest || [], linkedVideos: item.linkedVideos || [], translations: item.translations || {} });
   };
 
   const handleUpdateTicker = async () => {
     if (!editingTicker) return;
     const updated = ticker.map((t: any) => t.id === editingTicker.id ? { ...t, ...tickerForm } : t);
     setTickerState(updated);
-    await saveTicker({ ...tickerForm, id: editingTicker.id });
-    showMessage("✅ Ticker updated!");
+    await saveSection("ticker", updated, "Ticker updated!");
     resetTickerForm();
   };
 
   const handleDeleteTicker = async (id: string) => {
     if (!confirm("Delete this ticker?")) return;
-    const updated = ticker.filter((t: any) => t.id !== id); 
-    setTickerState(updated);
-    await deleteTicker(id);
-    showMessage("✅ Ticker deleted!");
+    const updated = ticker.filter((t: any) => t.id !== id); setTickerState(updated);
+    await saveSection("ticker", updated, "Ticker deleted!");
+  };
+
+  const resetTickerForm = () => {
+    setEditingTicker(null);
+    setTickerForm({ text: "", active: true, linkedStories: [], linkedLatest: [], linkedVideos: [], translations: {} });
   };
 
   const toggleLinkedItem = (type: 'stories' | 'latest' | 'videos', id: string) => {
     const key = type === 'stories' ? 'linkedStories' : type === 'latest' ? 'linkedLatest' : 'linkedVideos';
     const current = tickerForm[key] as string[];
-    if (current.includes(id)) {
-      setTickerForm({ ...tickerForm, [key]: current.filter((i: string) => i !== id) });
-    } else {
-      setTickerForm({ ...tickerForm, [key]: [...current, id] });
-    }
+    if (current.includes(id)) setTickerForm({ ...tickerForm, [key]: current.filter((i: string) => i !== id) });
+    else setTickerForm({ ...tickerForm, [key]: [...current, id] });
   };
 
-  const getFilteredTopStories = () => topStories.filter(s => { 
-    if (tickerLinkLang && s.language !== tickerLinkLang) return false; 
-    if (tickerLinkCat && s.category !== tickerLinkCat) return false; 
-    return true; 
-  });
-  const getFilteredLatestNews = () => latestNews.filter(s => { 
-    if (tickerLinkLang && s.language !== tickerLinkLang) return false; 
-    if (tickerLinkCat && s.category !== tickerLinkCat) return false; 
-    return true; 
-  });
-  const getFilteredVideos = () => videos.filter(v => { 
-    if (tickerLinkLang && v.language !== tickerLinkLang) return false; 
-    if (tickerLinkCat && v.category !== tickerLinkCat) return false; 
-    return true; 
-  });
+  const getFilteredTopStories = () => topStories.filter(s => { if (tickerLinkLang && s.language !== tickerLinkLang) return false; if (tickerLinkCat && s.category !== tickerLinkCat) return false; return true; });
+  const getFilteredLatestNews = () => latestNews.filter(s => { if (tickerLinkLang && s.language !== tickerLinkLang) return false; if (tickerLinkCat && s.category !== tickerLinkCat) return false; return true; });
+  const getFilteredVideos = () => videos.filter(v => { if (tickerLinkLang && v.language !== tickerLinkLang) return false; if (tickerLinkCat && v.category !== tickerLinkCat) return false; return true; });
 
-  // ============================================================
-  // SPORTS FUNCTIONS
-  // ============================================================
+  const addSport = () => { setSportsState([...sports, { sport: "New Sport", match: "", score: "", detail: "", show: true }]); showMessage("New sport added."); };
+  const removeSport = (index: number) => { setSportsState(sports.filter((_, i) => i !== index)); };
+  const updateSport = (index: number, field: string, value: any) => { const updated = [...sports]; updated[index][field] = value; setSportsState(updated); };
+  const toggleSportShow = (index: number) => { const updated = [...sports]; updated[index].show = !updated[index].show; setSportsState(updated); };
+  const saveSports = async () => { await saveSection("sports", sports, "Sports saved!"); };
 
-  const addSport = () => { 
-    setSportsState([...sports, { sport: "New Sport", match: "", score: "", detail: "", show: true }]); 
-    showMessage("New sport added."); 
-  };
-
-  const removeSport = (index: number) => { 
-    setSportsState(sports.filter((_, i) => i !== index)); 
-  };
-
-  const updateSport = (index: number, field: string, value: any) => { 
-    const updated = [...sports]; 
-    updated[index][field] = value; 
-    setSportsState(updated); 
-  };
-
-  const toggleSportShow = (index: number) => { 
-    const updated = [...sports]; 
-    updated[index].show = !updated[index].show; 
-    setSportsState(updated); 
-  };
-
-  const saveSportsData = async () => { 
-    await saveSports(sports);
-    showMessage("✅ Sports saved!");
-  };
-
-  // ============================================================
-  // WEATHER CITY FUNCTIONS
-  // ============================================================
-
-  const addCity = () => { 
-    setWeatherCitiesState([...weatherCities, { city: "New City", temp: "0°C", condition: "Unknown" }]); 
-  };
-
-  const removeCity = (index: number) => { 
-    setWeatherCitiesState(weatherCities.filter((_, i) => i !== index)); 
-  };
-
-  const updateCity = (index: number, field: string, value: any) => { 
-    const updated = [...weatherCities]; 
-    updated[index][field] = value; 
-    setWeatherCitiesState(updated); 
-  };
-
-  const saveCitiesData = async () => { 
-    await saveWeatherCities(weatherCities);
-    showMessage("✅ Cities saved!");
-  };
-
-  // ============================================================
-  // ELECTION FUNCTIONS
-  // ============================================================
+  const addCity = () => { setWeatherCitiesState([...weatherCities, { city: "New City", temp: "0°C", condition: "Unknown" }]); };
+  const removeCity = (index: number) => { setWeatherCitiesState(weatherCities.filter((_, i) => i !== index)); };
+  const updateCity = (index: number, field: string, value: any) => { const updated = [...weatherCities]; updated[index][field] = value; setWeatherCitiesState(updated); };
+  const saveCities = async () => { await saveSection("weatherCities", weatherCities, "Cities saved!"); };
 
   const addElectionState = () => {
     const defaultParties = [
@@ -917,7 +671,7 @@ export default function AdminPanel() {
     };
     defaultParties.forEach(p => { newState[p.key] = 0; });
     setElectionStatesState([...electionStates, newState]);
-    showMessage("New state added.");
+    showMessage("New state added. Edit name, parties and seats, then save.");
   };
 
   const removeElectionState = (index: number) => {
@@ -1011,26 +765,22 @@ export default function AdminPanel() {
     }
   };
 
-  const saveElectionStatesData = async () => {
-    await saveElectionStates(electionStates);
-    showMessage("✅ Election states saved!");
+  const saveElectionStates = async () => {
+    await saveSection("electionStates", electionStates, "Election states saved!");
   };
 
-  const toggleElectionVisibilityData = async () => {
+  const toggleElectionVisibility = async () => {
     const nv = !electionVisible;
     setElectionVisible(nv);
-    await toggleElectionVisibility(nv);
-    showMessage(nv ? "Election visible" : "Election hidden");
+    await saveSection("electionVisible", nv, nv ? "Election visible" : "Election hidden");
   };
 
-  const saveNoElectionMessageData = async () => {
-    await saveNoElectionMessage(noElectionMessage);
-    showMessage("✅ Message saved!");
+  const saveNoElectionMessage = async () => {
+    await saveSection("noElectionMessage", noElectionMessage, "Message saved!");
   };
 
-  const saveElectionConfigData = async () => {
-    await saveElectionConfig(electionConfig);
-    showMessage("✅ Election config saved!");
+  const saveElectionConfig = async () => {
+    await saveSection("electionConfig", electionConfig, "Election config saved!");
   };
 
   const autoFetchElection = async () => {
@@ -1081,17 +831,16 @@ export default function AdminPanel() {
           };
         });
         setElectionStatesState(fetchedStates);
-        await saveElectionStates(fetchedStates);
+        await saveSection("electionStates", fetchedStates, "Election states fetched!");
         if (data.totalSeats) {
           const config = { ...electionConfig, totalSeats: data.totalSeats };
           setElectionConfigState(config);
-          await saveElectionConfig(config);
+          await saveSection("electionConfig", config, "Election config updated!");
         }
-        showMessage("✅ Election states fetched!");
       } else {
         showMessage(data.message || "No active elections");
         setElectionVisible(false);
-        await toggleElectionVisibility(false);
+        await saveSection("electionVisible", false, "Election hidden - no active elections");
       }
     } catch {
       showMessage("Failed to fetch election data");
@@ -1099,65 +848,22 @@ export default function AdminPanel() {
     setLoading(false);
   };
 
-  // ============================================================
-  // SOCIAL LINKS FUNCTIONS
-  // ============================================================
+  const addSocialLink = () => { setSocialLinks([...socialLinks, { platform: "", url: "" }]); };
+  const removeSocialLink = (index: number) => { setSocialLinks(socialLinks.filter((_, i) => i !== index)); };
+  const updateSocialLink = (index: number, field: 'platform' | 'url', value: string) => { const updated = [...socialLinks]; updated[index][field] = value; setSocialLinks(updated); };
+  const saveSocialLinks = async () => { const valid = socialLinks.filter(s => s.platform.trim() && s.url.trim()); await saveSection("socialLinks", valid, "Social links saved!"); setSocialLinks(valid); };
 
-  const addSocialLink = () => { 
-    setSocialLinks([...socialLinks, { platform: "", url: "" }]); 
-  };
-
-  const removeSocialLink = (index: number) => { 
-    setSocialLinks(socialLinks.filter((_, i) => i !== index)); 
-  };
-
-  const updateSocialLink = (index: number, field: 'platform' | 'url', value: string) => { 
-    const updated = [...socialLinks]; 
-    updated[index][field] = value; 
-    setSocialLinks(updated); 
-  };
-
-  const saveSocialLinksData = async () => { 
-    const valid = socialLinks.filter(s => s.platform.trim() && s.url.trim()); 
-    await saveSocialLinks(valid);
-    setSocialLinks(valid);
-    showMessage("✅ Social links saved!");
-  };
-
-  // ============================================================
-  // MARKET, WEATHER, FOOTER FUNCTIONS
-  // ============================================================
-
-  const saveMarketDataFn = async () => { 
-    await saveMarketData(market);
-    showMessage("✅ Market saved!");
-  };
-
-  const saveWeatherDataFn = async () => { 
-    await saveWeatherData(weather);
-    showMessage("✅ Weather saved!");
-  };
-
-  const saveFooterDataFn = async () => { 
-    await saveFooterDescription(footerDesc);
-    showMessage("✅ Footer saved!");
-  };
+  const saveMarket = async () => { await saveSection("marketData", market, "Market saved!"); };
+  const saveWeather = async () => { await saveSection("weatherData", weather, "Weather saved!"); };
+  const saveFooter = async () => { await saveSection("footerDescription", footerDesc, "Footer saved!"); };
 
   const autoFetchMarket = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/market"); 
-      const data = await response.json();
-      if (data && data.usdInr) { 
-        setMarketState(data); 
-        await saveMarketData(data);
-        showMessage("✅ Market fetched!");
-      } else {
-        showMessage("No market data available");
-      }
-    } catch { 
-      showMessage("Failed to fetch market data"); 
-    }
+      const response = await fetch("/api/market"); const data = await response.json();
+      if (data && data.usdInr) { setMarketState(data); await saveSection("marketData", data, "Market fetched!"); }
+      else showMessage("No market data available");
+    } catch { showMessage("Failed to fetch market data"); }
     setLoading(false);
   };
 
@@ -1165,68 +871,65 @@ export default function AdminPanel() {
     setLoading(true);
     try {
       const city = weather.city || "New Delhi";
-      const response = await fetch(`/api/weather?city=${encodeURIComponent(city)}`); 
-      const data = await response.json();
-      if (data && data.temp) { 
-        setWeatherState(data); 
-        await saveWeatherData(data);
-        showMessage("✅ Weather fetched!");
-      } else {
-        showMessage("No weather data available");
-      }
-    } catch { 
-      showMessage("Failed to fetch weather data"); 
-    }
+      const response = await fetch(`/api/weather?city=${encodeURIComponent(city)}`); const data = await response.json();
+      if (data && data.temp) { setWeatherState(data); await saveSection("weatherData", data, "Weather fetched!"); }
+      else showMessage("No weather data available");
+    } catch { showMessage("Failed to fetch weather data"); }
     setLoading(false);
   };
 
-  // ============================================================
-  // LOGIN SCREEN
-  // ============================================================
-
+  // ============ LOGIN SCREEN ============
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white flex flex-col justify-center items-center px-4">
-        <form onSubmit={handleLogin} className="w-full max-w-md bg-slate-950 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-4">
+      <div className="min-h-screen flex flex-col justify-center items-center px-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkBg : '#f8fafc', color: isDark ? darkText : '#0f172a' }}>
+        <form onSubmit={handleLogin} className="w-full max-w-md rounded-2xl p-8 shadow-2xl space-y-4 border transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
           <div className="text-center space-y-2">
-            <div className="mx-auto w-12 h-12 bg-red-950 border border-red-800 rounded-xl flex items-center justify-center text-red-500 mb-2"><Lock className="w-5 h-5" /></div>
-            <h1 className="text-xl font-black tracking-tight">UNSUNG Network CMS</h1>
-            <p className="text-xs text-slate-500">Complete Content Management System</p>
+            <div className="mx-auto w-12 h-12 rounded-xl flex items-center justify-center mb-2" style={{ backgroundColor: isDark ? '#2d2d2d' : '#fef2f2', borderColor: isDark ? darkBorder : '#fca5a5' }}>
+              <Lock className="w-5 h-5" style={{ color: isDark ? '#f87171' : '#dc2626' }} />
+            </div>
+            <h1 className="text-xl font-black tracking-tight transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>UNSUNG Network CMS</h1>
+            <p className="text-xs transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Complete Content Management System</p>
           </div>
-          <div><label className="block text-[10px] font-bold tracking-wider uppercase text-slate-400 mb-1">User ID</label><input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full text-xs p-3 rounded-lg border border-slate-800 bg-slate-900 focus:outline-none focus:border-red-600 text-white" required /></div>
-          <div><label className="block text-[10px] font-bold tracking-wider uppercase text-slate-400 mb-1">Access Password</label><input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full text-xs p-3 rounded-lg border border-slate-800 bg-slate-900 focus:outline-none focus:border-red-600 text-white" required /></div>
-          {authError && <p className="text-[11px] font-bold text-rose-500 text-center bg-rose-950/30 py-2 rounded-md">{authError}</p>}
+          <div>
+            <label className="block text-[10px] font-bold tracking-wider uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>User ID</label>
+            <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full text-xs p-3 rounded-lg border focus:outline-none focus:border-red-600 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#f8fafc', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} required />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold tracking-wider uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Access Password</label>
+            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full text-xs p-3 rounded-lg border focus:outline-none focus:border-red-600 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#f8fafc', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} required />
+          </div>
+          {authError && <p className="text-[11px] font-bold text-rose-500 text-center py-2 rounded-md" style={{ backgroundColor: isDark ? '#2d2d2d' : '#fef2f2' }}>{authError}</p>}
           <button type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs h-11 rounded-lg transition cursor-pointer">Unlock Full Terminal</button>
         </form>
-        <Link href="/" className="text-xs font-bold text-slate-600 hover:text-slate-400 mt-6 flex items-center gap-1"><ArrowLeft className="w-3 h-3" /> Cancel and Go Home</Link>
+        <Link href="/" className="text-xs font-bold mt-6 flex items-center gap-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}><ArrowLeft className="w-3 h-3" /> Cancel and Go Home</Link>
       </div>
     );
   }
 
-  // ============================================================
-  // MAIN ADMIN PANEL RENDER
-  // ============================================================
-
+  // ============ ADMIN PANEL ============
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="min-h-screen transition-colors duration-300" style={{ backgroundColor: isDark ? darkBg : '#f8fafc', color: isDark ? darkText : '#0f172a' }}>
       {/* TOP HEADER */}
-      <div className="bg-slate-900 text-white sticky top-0 z-50 shadow-lg">
+      <div className="sticky top-0 z-50 shadow-lg transition-colors duration-300" style={{ backgroundColor: isDark ? '#1e1e1e' : '#0f172a', color: isDark ? darkText : '#ffffff' }}>
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center font-black text-sm">UN</div>
-            <div><h1 className="text-sm font-black tracking-tight">CMS Admin</h1><p className="text-[10px] text-slate-400 font-medium">Multi-Language</p></div>
+            <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center font-black text-sm text-white">UN</div>
+            <div>
+              <h1 className="text-sm font-black tracking-tight" style={{ color: isDark ? darkText : '#ffffff' }}>CMS Admin</h1>
+              <p className="text-[10px] font-medium" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>Multi-Language</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
-            {savedMessage && <span className="text-xs text-emerald-400 font-bold bg-emerald-900/30 px-3 py-1 rounded-full">{savedMessage}</span>}
-            {loading && <div className="w-4 h-4 border-2 border-slate-600 border-t-white rounded-full animate-spin"></div>}
-            <button onClick={loadAllData} className="text-xs font-bold bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition flex items-center gap-1"><RefreshCw className="w-3 h-3" /> Reload</button>
-            <button onClick={handleLogout} className="text-xs font-bold bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg transition">Logout</button>
+            {savedMessage && <span className="text-xs font-bold px-3 py-1 rounded-full" style={{ backgroundColor: isDark ? '#065f46' : '#064e3b', color: isDark ? '#34d399' : '#6ee7b7' }}>{savedMessage}</span>}
+            {loading && <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: isDark ? '#333333' : '#e2e8f0', borderTopColor: '#ffffff' }}></div>}
+            <button onClick={loadAllData} className="text-xs font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1" style={{ backgroundColor: isDark ? '#2d2d2d' : '#1e293b', color: isDark ? darkText : '#cbd5e1' }}><RefreshCw className="w-3 h-3" /> Reload</button>
+            <button onClick={handleLogout} className="text-xs font-bold px-3 py-1.5 rounded-lg transition bg-red-600 hover:bg-red-700 text-white">Logout</button>
           </div>
         </div>
       </div>
 
       {/* TAB NAVIGATION */}
-      <div className="bg-white border-b border-slate-200 overflow-x-auto scrollbar-none sticky top-16 z-40">
+      <div className="border-b overflow-x-auto scrollbar-none sticky top-16 z-40 transition-colors duration-300" style={{ backgroundColor: isDark ? '#1e1e1e' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
         <div className="max-w-7xl mx-auto px-4 flex gap-1 h-12 items-center">
           {[
             { id: "dashboard", label: "Dashboard", icon: Home },
@@ -1240,7 +943,7 @@ export default function AdminPanel() {
             { id: "tv", label: "TV Channels", icon: Tv },
             { id: "footer", label: "Footer", icon: Layers }
           ].map((tab) => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${activeTab === tab.id ? "bg-red-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${activeTab === tab.id ? "bg-red-600 text-white" : isDark ? "text-[#c8c8c8] hover:bg-[#2d2d2d]" : "text-slate-600 hover:bg-slate-100"}`}>
               <tab.icon className="w-3.5 h-3.5" />{tab.label}
             </button>
           ))}
@@ -1250,13 +953,13 @@ export default function AdminPanel() {
       {/* Translation Edit Modal */}
       {editingTranslation && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 space-y-4">
+          <div className="rounded-xl shadow-2xl w-full max-w-lg p-6 space-y-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-black text-slate-900">Edit {LANGUAGES.find(l => l.code === editingTranslation.lang)?.nativeName} Translation</h3>
-              <button onClick={() => setEditingTranslation(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              <h3 className="text-sm font-black transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Edit {LANGUAGES.find(l => l.code === editingTranslation.lang)?.nativeName} Translation</h3>
+              <button onClick={() => setEditingTranslation(null)} className="transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}><X className="w-5 h-5" /></button>
             </div>
-            <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Title</label><input type="text" value={editingTranslation.title} onChange={(e) => setEditingTranslation({...editingTranslation, title: e.target.value})} className="w-full text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
-            <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Description</label><textarea value={editingTranslation.description} onChange={(e) => setEditingTranslation({...editingTranslation, description: e.target.value})} className="w-full text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500 h-32" /></div>
+            <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Title</label><input type="text" value={editingTranslation.title} onChange={(e) => setEditingTranslation({...editingTranslation, title: e.target.value})} className="w-full text-xs p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+            <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Description</label><textarea value={editingTranslation.description} onChange={(e) => setEditingTranslation({...editingTranslation, description: e.target.value})} className="w-full text-xs p-2 border rounded-lg focus:outline-none focus:border-red-500 h-32 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setEditingTranslation(null)} className="bg-slate-600 hover:bg-slate-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition">Cancel</button>
               <button onClick={saveTranslationEdit} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save</button>
@@ -1265,161 +968,101 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* ============================================================
-          MAIN CONTENT - All Tabs
-          ============================================================ */}
+      {/* MAIN CONTENT */}
       <div className="max-w-7xl mx-auto px-4 py-6">
 
         {/* ==================== DASHBOARD ==================== */}
         {activeTab === "dashboard" && (
           <div>
-            <h2 className="text-xl font-black text-slate-900 mb-1">Dashboard Overview</h2>
-            <p className="text-xs text-slate-500 mb-4">Monitor content across all languages</p>
+            <h2 className="text-xl font-black mb-1 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Dashboard Overview</h2>
+            <p className="text-xs mb-4 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Monitor content across all languages</p>
 
             <div className="flex items-center gap-3 mb-6 flex-wrap">
-              <span className="text-xs font-bold text-slate-600">Filter by Language:</span>
+              <span className="text-xs font-bold transition-colors duration-300" style={{ color: isDark ? darkTextSecondary : '#475569' }}>Filter by Language:</span>
               <div className="flex flex-wrap gap-1.5">
-                <button onClick={() => setDashboardLangFilter("all")} className={`text-xs font-bold px-3 py-1.5 rounded-md transition ${dashboardLangFilter === "all" ? "bg-red-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:border-red-300"}`}>
-                  🌐 All
-                </button>
+                <button onClick={() => setDashboardLangFilter("all")} className={`text-xs font-bold px-3 py-1.5 rounded-md transition ${dashboardLangFilter === "all" ? "bg-red-600 text-white" : isDark ? "bg-[#2d2d2d] text-[#c8c8c8] border border-[#333333] hover:border-red-300" : "bg-white text-slate-600 border border-slate-200 hover:border-red-300"}`}>🌐 All</button>
                 {LANGUAGES.map(lang => (
-                  <button key={lang.code} onClick={() => setDashboardLangFilter(lang.code)} className={`text-xs font-bold px-3 py-1.5 rounded-md transition ${dashboardLangFilter === lang.code ? "bg-red-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:border-red-300"}`}>
-                    {lang.nativeName}
-                  </button>
+                  <button key={lang.code} onClick={() => setDashboardLangFilter(lang.code)} className={`text-xs font-bold px-3 py-1.5 rounded-md transition ${dashboardLangFilter === lang.code ? "bg-red-600 text-white" : isDark ? "bg-[#2d2d2d] text-[#c8c8c8] border border-[#333333] hover:border-red-300" : "bg-white text-slate-600 border border-slate-200 hover:border-red-300"}`}>{lang.nativeName}</button>
                 ))}
               </div>
             </div>
 
             {dashboardLangFilter === "all" && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+              <div className="rounded-xl p-4 mb-6 border transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#fffbeb', borderColor: isDark ? '#3d3d3d' : '#fcd34d' }}>
                 <div className="flex items-center gap-2 mb-3">
-                  <Globe className="w-4 h-4 text-amber-600" />
-                  <h3 className="text-sm font-bold text-amber-800">"All Languages" View Content</h3>
-                  <span className="text-[10px] text-amber-600 ml-auto">
-                    Check items to show in the default All Languages view for new visitors
-                  </span>
+                  <Globe className="w-4 h-4" style={{ color: isDark ? '#fbbf24' : '#d97706' }} />
+                  <h3 className="text-sm font-bold" style={{ color: isDark ? '#fbbf24' : '#92400e' }}>"All Languages" View Content</h3>
+                  <span className="text-[10px] ml-auto transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#b45309' }}>Check items to show in the default All Languages view for new visitors</span>
                 </div>
-                
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-lg border border-amber-200 p-3">
-                    <h4 className="text-xs font-bold text-slate-700 mb-2">
-                      Top Stories ({topStories.filter((s: any) => s.featuredInAll).length} featured)
-                    </h4>
+                  {/* Top Stories Featured */}
+                  <div className="rounded-lg border p-3 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#fcd34d' }}>
+                    <h4 className="text-xs font-bold mb-2 transition-colors duration-300" style={{ color: isDark ? darkTextSecondary : '#374151' }}>Top Stories ({topStories.filter((s: any) => s.featuredInAll).length} featured)</h4>
                     <div className="space-y-1 max-h-60 overflow-y-auto">
-                      {topStories.length === 0 && <p className="text-xs text-slate-400 text-center py-4">No top stories</p>}
+                      {topStories.length === 0 && <p className="text-xs text-center py-4 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#9ca3af' }}>No top stories</p>}
                       {topStories.map((story: any) => (
-                        <label key={story.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded text-xs cursor-pointer">
-                          <input 
-                            type="checkbox" 
-                            checked={story.featuredInAll === true}
-                            onChange={async () => {
-                              const updated = topStories.map((s: any) => 
-                                s.id === story.id ? { ...s, featuredInAll: !s.featuredInAll } : s
-                              );
-                              setTopStoriesState(updated);
-                              const updatedStory = updated.find((s: any) => s.id === story.id);
-                              if (updatedStory) {
-                                await saveStory(updatedStory, 'top');
-                              }
-                              showMessage(`"${story.title.substring(0, 30)}..." ${story.featuredInAll ? 'removed from' : 'added to'} All Languages`);
-                            }}
-                            className="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-                          />
-                          <span className="truncate flex-1">{story.title}</span>
-                          <span className="text-[9px] text-slate-400 whitespace-nowrap">{LANGUAGES.find(l => l.code === story.language)?.nativeName || '?'}</span>
+                        <label key={story.id} className="flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-[#2d2d2d] transition-colors duration-300">
+                          <input type="checkbox" checked={story.featuredInAll === true} onChange={async () => {
+                            const updated = topStories.map((s: any) => s.id === story.id ? { ...s, featuredInAll: !s.featuredInAll } : s);
+                            setTopStoriesState(updated);
+                            await saveSection("topStories", updated, `"${story.title.substring(0, 30)}..." ${story.featuredInAll ? 'removed from' : 'added to'} All Languages`);
+                          }} className="w-3.5 h-3.5 rounded border-slate-300 dark:border-[#333333] text-amber-600 focus:ring-amber-500" />
+                          <span className="truncate flex-1 transition-colors duration-300" style={{ color: isDark ? darkText : '#1f2937' }}>{story.title}</span>
+                          <span className="text-[9px] whitespace-nowrap transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#9ca3af' }}>{LANGUAGES.find(l => l.code === story.language)?.nativeName || '?'}</span>
                         </label>
                       ))}
                     </div>
                   </div>
-
-                  <div className="bg-white rounded-lg border border-amber-200 p-3">
-                    <h4 className="text-xs font-bold text-slate-700 mb-2">
-                      Latest News ({latestNews.filter((s: any) => s.featuredInAll).length} featured)
-                    </h4>
+                  {/* Latest News Featured */}
+                  <div className="rounded-lg border p-3 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#fcd34d' }}>
+                    <h4 className="text-xs font-bold mb-2 transition-colors duration-300" style={{ color: isDark ? darkTextSecondary : '#374151' }}>Latest News ({latestNews.filter((s: any) => s.featuredInAll).length} featured)</h4>
                     <div className="space-y-1 max-h-60 overflow-y-auto">
-                      {latestNews.length === 0 && <p className="text-xs text-slate-400 text-center py-4">No latest news</p>}
+                      {latestNews.length === 0 && <p className="text-xs text-center py-4 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#9ca3af' }}>No latest news</p>}
                       {latestNews.map((story: any) => (
-                        <label key={story.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded text-xs cursor-pointer">
-                          <input 
-                            type="checkbox" 
-                            checked={story.featuredInAll === true}
-                            onChange={async () => {
-                              const updated = latestNews.map((s: any) => 
-                                s.id === story.id ? { ...s, featuredInAll: !s.featuredInAll } : s
-                              );
-                              setLatestNewsState(updated);
-                              const updatedStory = updated.find((s: any) => s.id === story.id);
-                              if (updatedStory) {
-                                await saveStory(updatedStory, 'latest');
-                              }
-                              showMessage(`"${story.title.substring(0, 30)}..." ${story.featuredInAll ? 'removed from' : 'added to'} All Languages`);
-                            }}
-                            className="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-                          />
-                          <span className="truncate flex-1">{story.title}</span>
-                          <span className="text-[9px] text-slate-400 whitespace-nowrap">{LANGUAGES.find(l => l.code === story.language)?.nativeName || '?'}</span>
+                        <label key={story.id} className="flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-[#2d2d2d] transition-colors duration-300">
+                          <input type="checkbox" checked={story.featuredInAll === true} onChange={async () => {
+                            const updated = latestNews.map((s: any) => s.id === story.id ? { ...s, featuredInAll: !s.featuredInAll } : s);
+                            setLatestNewsState(updated);
+                            await saveSection("latestNews", updated, `"${story.title.substring(0, 30)}..." ${story.featuredInAll ? 'removed from' : 'added to'} All Languages`);
+                          }} className="w-3.5 h-3.5 rounded border-slate-300 dark:border-[#333333] text-amber-600 focus:ring-amber-500" />
+                          <span className="truncate flex-1 transition-colors duration-300" style={{ color: isDark ? darkText : '#1f2937' }}>{story.title}</span>
+                          <span className="text-[9px] whitespace-nowrap transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#9ca3af' }}>{LANGUAGES.find(l => l.code === story.language)?.nativeName || '?'}</span>
                         </label>
                       ))}
                     </div>
                   </div>
-
+                  {/* Videos + Channels Featured */}
                   <div className="space-y-3">
-                    <div className="bg-white rounded-lg border border-amber-200 p-3">
-                      <h4 className="text-xs font-bold text-slate-700 mb-2">
-                        Videos ({videos.filter((v: any) => v.featuredInAll).length} featured)
-                      </h4>
+                    <div className="rounded-lg border p-3 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#fcd34d' }}>
+                      <h4 className="text-xs font-bold mb-2 transition-colors duration-300" style={{ color: isDark ? darkTextSecondary : '#374151' }}>Videos ({videos.filter((v: any) => v.featuredInAll).length} featured)</h4>
                       <div className="space-y-1 max-h-28 overflow-y-auto">
-                        {videos.length === 0 && <p className="text-xs text-slate-400 text-center py-4">No videos</p>}
+                        {videos.length === 0 && <p className="text-xs text-center py-4 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#9ca3af' }}>No videos</p>}
                         {videos.map((vid: any) => (
-                          <label key={vid.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded text-xs cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              checked={vid.featuredInAll === true}
-                              onChange={async () => {
-                                const updated = videos.map((v: any) => 
-                                  v.id === vid.id ? { ...v, featuredInAll: !v.featuredInAll } : v
-                                );
-                                setVideosState(updated);
-                                const updatedVideo = updated.find((v: any) => v.id === vid.id);
-                                if (updatedVideo) {
-                                  await saveVideo(updatedVideo);
-                                }
-                                showMessage(`"${vid.title.substring(0, 30)}..." ${vid.featuredInAll ? 'removed from' : 'added to'} All Languages`);
-                              }}
-                              className="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-                            />
-                            <span className="truncate flex-1">{vid.title}</span>
-                            <span className="text-[9px] text-slate-400 whitespace-nowrap">{LANGUAGES.find(l => l.code === vid.language)?.nativeName || '?'}</span>
+                          <label key={vid.id} className="flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-[#2d2d2d] transition-colors duration-300">
+                            <input type="checkbox" checked={vid.featuredInAll === true} onChange={async () => {
+                              const updated = videos.map((v: any) => v.id === vid.id ? { ...v, featuredInAll: !v.featuredInAll } : v);
+                              setVideosState(updated);
+                              await saveSection("videos", updated, `"${vid.title.substring(0, 30)}..." ${vid.featuredInAll ? 'removed from' : 'added to'} All Languages`);
+                            }} className="w-3.5 h-3.5 rounded border-slate-300 dark:border-[#333333] text-amber-600 focus:ring-amber-500" />
+                            <span className="truncate flex-1 transition-colors duration-300" style={{ color: isDark ? darkText : '#1f2937' }}>{vid.title}</span>
+                            <span className="text-[9px] whitespace-nowrap transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#9ca3af' }}>{LANGUAGES.find(l => l.code === vid.language)?.nativeName || '?'}</span>
                           </label>
                         ))}
                       </div>
                     </div>
-                    <div className="bg-white rounded-lg border border-amber-200 p-3">
-                      <h4 className="text-xs font-bold text-slate-700 mb-2">
-                        TV Channels ({tvChannels.filter((c: any) => c.featuredInAll).length} featured)
-                      </h4>
+                    <div className="rounded-lg border p-3 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#fcd34d' }}>
+                      <h4 className="text-xs font-bold mb-2 transition-colors duration-300" style={{ color: isDark ? darkTextSecondary : '#374151' }}>TV Channels ({tvChannels.filter((c: any) => c.featuredInAll).length} featured)</h4>
                       <div className="space-y-1 max-h-28 overflow-y-auto">
-                        {tvChannels.length === 0 && <p className="text-xs text-slate-400 text-center py-4">No channels</p>}
+                        {tvChannels.length === 0 && <p className="text-xs text-center py-4 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#9ca3af' }}>No channels</p>}
                         {tvChannels.map((ch: any) => (
-                          <label key={ch.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded text-xs cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              checked={ch.featuredInAll === true}
-                              onChange={async () => {
-                                const updated = tvChannels.map((c: any) => 
-                                  c.id === ch.id ? { ...c, featuredInAll: !c.featuredInAll } : c
-                                );
-                                setTvChannelsState(updated);
-                                const updatedChannel = updated.find((c: any) => c.id === ch.id);
-                                if (updatedChannel) {
-                                  await saveTvChannel(updatedChannel);
-                                }
-                                showMessage(`"${ch.name}" ${ch.featuredInAll ? 'removed from' : 'added to'} All Languages`);
-                              }}
-                              className="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-                            />
-                            <span className="truncate flex-1">{ch.name}</span>
-                            <span className="text-[9px] text-slate-400 whitespace-nowrap">{LANGUAGES.find(l => l.code === ch.language)?.nativeName || '?'}</span>
+                          <label key={ch.id} className="flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-[#2d2d2d] transition-colors duration-300">
+                            <input type="checkbox" checked={ch.featuredInAll === true} onChange={async () => {
+                              const updated = tvChannels.map((c: any) => c.id === ch.id ? { ...c, featuredInAll: !c.featuredInAll } : c);
+                              setTvChannelsState(updated);
+                              await saveSection("tvChannels", updated, `"${ch.name}" ${ch.featuredInAll ? 'removed from' : 'added to'} All Languages`);
+                            }} className="w-3.5 h-3.5 rounded border-slate-300 dark:border-[#333333] text-amber-600 focus:ring-amber-500" />
+                            <span className="truncate flex-1 transition-colors duration-300" style={{ color: isDark ? darkText : '#1f2937' }}>{ch.name}</span>
+                            <span className="text-[9px] whitespace-nowrap transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#9ca3af' }}>{LANGUAGES.find(l => l.code === ch.language)?.nativeName || '?'}</span>
                           </label>
                         ))}
                       </div>
@@ -1432,42 +1075,41 @@ export default function AdminPanel() {
             {dashboardLangFilter === "all" ? (
               <>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Top Stories</p>
-                    <p className="text-2xl font-black text-slate-900">{topStories.length}</p>
-                    <p className="text-[10px] text-slate-400 mt-1">{countWithoutLanguage(topStories)} unassigned</p>
+                  <div className="rounded-xl border p-4 shadow-xs transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                    <p className="text-[10px] font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>Top Stories</p>
+                    <p className="text-2xl font-black transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>{topStories.length}</p>
+                    <p className="text-[10px] mt-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>{countWithoutLanguage(topStories)} unassigned</p>
                   </div>
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Latest News</p>
-                    <p className="text-2xl font-black text-slate-900">{latestNews.length}</p>
-                    <p className="text-[10px] text-slate-400 mt-1">{countWithoutLanguage(latestNews)} unassigned</p>
+                  <div className="rounded-xl border p-4 shadow-xs transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                    <p className="text-[10px] font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>Latest News</p>
+                    <p className="text-2xl font-black transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>{latestNews.length}</p>
+                    <p className="text-[10px] mt-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>{countWithoutLanguage(latestNews)} unassigned</p>
                   </div>
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Videos</p>
-                    <p className="text-2xl font-black text-slate-900">{videos.length}</p>
-                    <p className="text-[10px] text-slate-400 mt-1">{countWithoutLanguage(videos)} unassigned</p>
+                  <div className="rounded-xl border p-4 shadow-xs transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                    <p className="text-[10px] font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>Videos</p>
+                    <p className="text-2xl font-black transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>{videos.length}</p>
+                    <p className="text-[10px] mt-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>{countWithoutLanguage(videos)} unassigned</p>
                   </div>
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">TV Channels</p>
-                    <p className="text-2xl font-black text-slate-900">{tvChannels.length}</p>
-                    <p className="text-[10px] text-slate-400 mt-1">{countWithoutLanguage(tvChannels)} unassigned</p>
+                  <div className="rounded-xl border p-4 shadow-xs transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                    <p className="text-[10px] font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>TV Channels</p>
+                    <p className="text-2xl font-black transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>{tvChannels.length}</p>
+                    <p className="text-[10px] mt-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>{countWithoutLanguage(tvChannels)} unassigned</p>
                   </div>
                 </div>
-
-                <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-                  <div className="p-4 border-b border-slate-200">
-                    <h3 className="text-sm font-bold text-slate-800">Content by Language</h3>
+                <div className="rounded-xl border shadow-xs overflow-hidden transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                  <div className="p-4 border-b transition-colors duration-300" style={{ borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                    <h3 className="text-sm font-bold transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Content by Language</h3>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="text-left p-3 font-bold text-slate-500 uppercase">Language</th>
-                          <th className="text-center p-3 font-bold text-slate-500 uppercase">Top Stories</th>
-                          <th className="text-center p-3 font-bold text-slate-500 uppercase">Latest News</th>
-                          <th className="text-center p-3 font-bold text-slate-500 uppercase">Videos</th>
-                          <th className="text-center p-3 font-bold text-slate-500 uppercase">TV Channels</th>
-                          <th className="text-center p-3 font-bold text-slate-500 uppercase">Total</th>
+                        <tr className="border-b transition-colors duration-300" style={{ backgroundColor: isDark ? darkHover : '#f8fafc', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                          <th className="text-left p-3 font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Language</th>
+                          <th className="text-center p-3 font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Top Stories</th>
+                          <th className="text-center p-3 font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Latest News</th>
+                          <th className="text-center p-3 font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Videos</th>
+                          <th className="text-center p-3 font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>TV Channels</th>
+                          <th className="text-center p-3 font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Total</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1477,24 +1119,22 @@ export default function AdminPanel() {
                           const vd = countByLanguage(videos, lang.code);
                           const ch = countByLanguage(tvChannels, lang.code);
                           const total = ts + ln + vd + ch;
-                          return (
-                            <tr key={lang.code} className="border-b border-slate-100 hover:bg-slate-50 transition">
-                              <td className="p-3 font-bold text-slate-700">{lang.nativeName} <span className="text-[10px] text-slate-400">({lang.name})</span></td>
-                              <td className="p-3 text-center">{ts > 0 ? <span className="bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded">{ts}</span> : <span className="text-slate-300">0</span>}</td>
-                              <td className="p-3 text-center">{ln > 0 ? <span className="bg-green-50 text-green-700 font-bold px-2 py-0.5 rounded">{ln}</span> : <span className="text-slate-300">0</span>}</td>
-                              <td className="p-3 text-center">{vd > 0 ? <span className="bg-purple-50 text-purple-700 font-bold px-2 py-0.5 rounded">{vd}</span> : <span className="text-slate-300">0</span>}</td>
-                              <td className="p-3 text-center">{ch > 0 ? <span className="bg-amber-50 text-amber-700 font-bold px-2 py-0.5 rounded">{ch}</span> : <span className="text-slate-300">0</span>}</td>
-                              <td className="p-3 text-center font-black text-slate-800">{total}</td>
-                            </tr>
-                          );
+                          return <tr key={lang.code} className="border-b transition-colors duration-300 hover:bg-slate-50 dark:hover:bg-[#2d2d2d]" style={{ borderColor: isDark ? darkBorder : '#f1f5f9' }}>
+                            <td className="p-3 font-bold transition-colors duration-300" style={{ color: isDark ? darkText : '#334155' }}>{lang.nativeName} <span className="text-[10px] transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>({lang.name})</span></td>
+                            <td className="p-3 text-center">{ts > 0 ? <span className="font-bold px-2 py-0.5 rounded" style={{ backgroundColor: isDark ? '#1e3a5f' : '#eff6ff', color: isDark ? '#60a5fa' : '#1d4ed8' }}>{ts}</span> : <span className="transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#cbd5e1' }}>0</span>}</td>
+                            <td className="p-3 text-center">{ln > 0 ? <span className="font-bold px-2 py-0.5 rounded" style={{ backgroundColor: isDark ? '#064e3b' : '#ecfdf5', color: isDark ? '#34d399' : '#065f46' }}>{ln}</span> : <span className="transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#cbd5e1' }}>0</span>}</td>
+                            <td className="p-3 text-center">{vd > 0 ? <span className="font-bold px-2 py-0.5 rounded" style={{ backgroundColor: isDark ? '#4c1d95' : '#f5f3ff', color: isDark ? '#a78bfa' : '#5b21b6' }}>{vd}</span> : <span className="transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#cbd5e1' }}>0</span>}</td>
+                            <td className="p-3 text-center">{ch > 0 ? <span className="font-bold px-2 py-0.5 rounded" style={{ backgroundColor: isDark ? '#78350f' : '#fffbeb', color: isDark ? '#fbbf24' : '#92400e' }}>{ch}</span> : <span className="transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#cbd5e1' }}>0</span>}</td>
+                            <td className="p-3 text-center font-black transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>{total}</td>
+                          </tr>;
                         })}
-                        <tr className="bg-slate-50 font-bold">
-                          <td className="p-3 text-slate-600">TOTAL</td>
-                          <td className="p-3 text-center text-slate-800">{topStories.length}</td>
-                          <td className="p-3 text-center text-slate-800">{latestNews.length}</td>
-                          <td className="p-3 text-center text-slate-800">{videos.length}</td>
-                          <td className="p-3 text-center text-slate-800">{tvChannels.length}</td>
-                          <td className="p-3 text-center text-slate-800">{topStories.length + latestNews.length + videos.length + tvChannels.length}</td>
+                        <tr className="font-bold transition-colors duration-300" style={{ backgroundColor: isDark ? darkHover : '#f8fafc' }}>
+                          <td className="p-3 transition-colors duration-300" style={{ color: isDark ? darkTextSecondary : '#475569' }}>TOTAL</td>
+                          <td className="p-3 text-center transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>{topStories.length}</td>
+                          <td className="p-3 text-center transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>{latestNews.length}</td>
+                          <td className="p-3 text-center transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>{videos.length}</td>
+                          <td className="p-3 text-center transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>{tvChannels.length}</td>
+                          <td className="p-3 text-center transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>{topStories.length + latestNews.length + videos.length + tvChannels.length}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -1502,96 +1142,89 @@ export default function AdminPanel() {
                 </div>
               </>
             ) : (
-              <div>
-                <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-6 mb-4">
-                  <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <>
+                <div className="rounded-xl border shadow-xs p-6 mb-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                  <h3 className="text-sm font-bold mb-4 flex items-center gap-2 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>
                     <Globe className="w-4 h-4 text-red-500" />
                     {LANGUAGES.find(l => l.code === dashboardLangFilter)?.nativeName} ({LANGUAGES.find(l => l.code === dashboardLangFilter)?.name}) Content
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div className="bg-blue-50 rounded-lg p-3 text-center">
-                      <p className="text-[10px] font-bold text-blue-600 uppercase">Top Stories</p>
-                      <p className="text-xl font-black text-blue-800">{countByLanguage(topStories, dashboardLangFilter)}</p>
+                    <div className="rounded-lg p-3 text-center transition-colors duration-300" style={{ backgroundColor: isDark ? '#1e3a5f' : '#eff6ff' }}>
+                      <p className="text-[10px] font-bold uppercase transition-colors duration-300" style={{ color: isDark ? '#60a5fa' : '#1d4ed8' }}>Top Stories</p>
+                      <p className="text-xl font-black transition-colors duration-300" style={{ color: isDark ? '#93c5fd' : '#1e3a8a' }}>{countByLanguage(topStories, dashboardLangFilter)}</p>
                     </div>
-                    <div className="bg-green-50 rounded-lg p-3 text-center">
-                      <p className="text-[10px] font-bold text-green-600 uppercase">Latest News</p>
-                      <p className="text-xl font-black text-green-800">{countByLanguage(latestNews, dashboardLangFilter)}</p>
+                    <div className="rounded-lg p-3 text-center transition-colors duration-300" style={{ backgroundColor: isDark ? '#064e3b' : '#ecfdf5' }}>
+                      <p className="text-[10px] font-bold uppercase transition-colors duration-300" style={{ color: isDark ? '#34d399' : '#065f46' }}>Latest News</p>
+                      <p className="text-xl font-black transition-colors duration-300" style={{ color: isDark ? '#6ee7b7' : '#064e3b' }}>{countByLanguage(latestNews, dashboardLangFilter)}</p>
                     </div>
-                    <div className="bg-purple-50 rounded-lg p-3 text-center">
-                      <p className="text-[10px] font-bold text-purple-600 uppercase">Videos</p>
-                      <p className="text-xl font-black text-purple-800">{countByLanguage(videos, dashboardLangFilter)}</p>
+                    <div className="rounded-lg p-3 text-center transition-colors duration-300" style={{ backgroundColor: isDark ? '#4c1d95' : '#f5f3ff' }}>
+                      <p className="text-[10px] font-bold uppercase transition-colors duration-300" style={{ color: isDark ? '#a78bfa' : '#5b21b6' }}>Videos</p>
+                      <p className="text-xl font-black transition-colors duration-300" style={{ color: isDark ? '#c4b5fd' : '#4c1d95' }}>{countByLanguage(videos, dashboardLangFilter)}</p>
                     </div>
-                    <div className="bg-amber-50 rounded-lg p-3 text-center">
-                      <p className="text-[10px] font-bold text-amber-600 uppercase">TV Channels</p>
-                      <p className="text-xl font-black text-amber-800">{countByLanguage(tvChannels, dashboardLangFilter)}</p>
+                    <div className="rounded-lg p-3 text-center transition-colors duration-300" style={{ backgroundColor: isDark ? '#78350f' : '#fffbeb' }}>
+                      <p className="text-[10px] font-bold uppercase transition-colors duration-300" style={{ color: isDark ? '#fbbf24' : '#92400e' }}>TV Channels</p>
+                      <p className="text-xl font-black transition-colors duration-300" style={{ color: isDark ? '#fcd34d' : '#78350f' }}>{countByLanguage(tvChannels, dashboardLangFilter)}</p>
                     </div>
                   </div>
                 </div>
-
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-4">
-                    <h4 className="text-sm font-bold text-slate-800 mb-3">Stories</h4>
+                  <div className="rounded-xl border shadow-xs p-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                    <h4 className="text-sm font-bold mb-3 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Stories</h4>
                     <div className="space-y-2 max-h-80 overflow-y-auto">
                       {[...topStories, ...latestNews].filter((s: any) => s.language === dashboardLangFilter).slice(0, 20).map((story: any) => (
-                        <div key={story.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg text-xs">
-                          <span className="font-medium truncate flex-1">{story.title}</span>
-                          <span className="text-[10px] text-slate-400 whitespace-nowrap">{story.category}</span>
+                        <div key={story.id} className="flex items-center gap-2 p-2 rounded-lg text-xs transition-colors duration-300" style={{ backgroundColor: isDark ? darkHover : '#f8fafc' }}>
+                          <span className="font-medium truncate flex-1 transition-colors duration-300" style={{ color: isDark ? darkText : '#1f2937' }}>{story.title}</span>
+                          <span className="text-[10px] whitespace-nowrap transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#9ca3af' }}>{story.category}</span>
                         </div>
                       ))}
-                      {[...topStories, ...latestNews].filter((s: any) => s.language === dashboardLangFilter).length === 0 && (
-                        <p className="text-xs text-slate-400 text-center py-4">No stories in this language</p>
-                      )}
+                      {[...topStories, ...latestNews].filter((s: any) => s.language === dashboardLangFilter).length === 0 && <p className="text-xs text-center py-4 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#9ca3af' }}>No stories in this language</p>}
                     </div>
                   </div>
                   <div className="space-y-6">
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-4">
-                      <h4 className="text-sm font-bold text-slate-800 mb-3">Videos</h4>
+                    <div className="rounded-xl border shadow-xs p-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                      <h4 className="text-sm font-bold mb-3 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Videos</h4>
                       <div className="space-y-2 max-h-40 overflow-y-auto">
                         {videos.filter((v: any) => v.language === dashboardLangFilter).slice(0, 10).map((vid: any) => (
-                          <div key={vid.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg text-xs">
-                            <span className="font-medium truncate flex-1">{vid.title}</span>
+                          <div key={vid.id} className="flex items-center gap-2 p-2 rounded-lg text-xs transition-colors duration-300" style={{ backgroundColor: isDark ? darkHover : '#f8fafc' }}>
+                            <span className="font-medium truncate flex-1 transition-colors duration-300" style={{ color: isDark ? darkText : '#1f2937' }}>{vid.title}</span>
                           </div>
                         ))}
-                        {videos.filter((v: any) => v.language === dashboardLangFilter).length === 0 && (
-                          <p className="text-xs text-slate-400 text-center py-4">No videos in this language</p>
-                        )}
+                        {videos.filter((v: any) => v.language === dashboardLangFilter).length === 0 && <p className="text-xs text-center py-4 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#9ca3af' }}>No videos in this language</p>}
                       </div>
                     </div>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-4">
-                      <h4 className="text-sm font-bold text-slate-800 mb-3">TV Channels</h4>
+                    <div className="rounded-xl border shadow-xs p-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                      <h4 className="text-sm font-bold mb-3 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>TV Channels</h4>
                       <div className="space-y-2 max-h-40 overflow-y-auto">
                         {tvChannels.filter((c: any) => c.language === dashboardLangFilter).slice(0, 10).map((ch: any) => (
-                          <div key={ch.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg text-xs">
-                            <span className="font-medium truncate flex-1">{ch.name}</span>
-                            <span className="text-[10px] text-slate-400">{ch.type}</span>
+                          <div key={ch.id} className="flex items-center gap-2 p-2 rounded-lg text-xs transition-colors duration-300" style={{ backgroundColor: isDark ? darkHover : '#f8fafc' }}>
+                            <span className="font-medium truncate flex-1 transition-colors duration-300" style={{ color: isDark ? darkText : '#1f2937' }}>{ch.name}</span>
+                            <span className="text-[10px] transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#9ca3af' }}>{ch.type}</span>
                           </div>
                         ))}
-                        {tvChannels.filter((c: any) => c.language === dashboardLangFilter).length === 0 && (
-                          <p className="text-xs text-slate-400 text-center py-4">No channels in this language</p>
-                        )}
+                        {tvChannels.filter((c: any) => c.language === dashboardLangFilter).length === 0 && <p className="text-xs text-center py-4 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#9ca3af' }}>No channels in this language</p>}
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              </>
             )}
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <p className="text-xs font-bold text-slate-400 uppercase">Ticker Items</p>
-                <p className="text-2xl font-black text-slate-900">{ticker.length}</p>
+              <div className="rounded-xl border p-4 shadow-xs transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                <p className="text-xs font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>Ticker Items</p>
+                <p className="text-2xl font-black transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>{ticker.length}</p>
               </div>
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <p className="text-xs font-bold text-slate-400 uppercase">Election States</p>
-                <p className="text-2xl font-black text-slate-900">{electionStates.length}</p>
+              <div className="rounded-xl border p-4 shadow-xs transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                <p className="text-xs font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>Election States</p>
+                <p className="text-2xl font-black transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>{electionStates.length}</p>
               </div>
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <p className="text-xs font-bold text-slate-400 uppercase">Sports</p>
-                <p className="text-2xl font-black text-slate-900">{sports.length}</p>
+              <div className="rounded-xl border p-4 shadow-xs transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                <p className="text-xs font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>Sports</p>
+                <p className="text-2xl font-black transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>{sports.length}</p>
               </div>
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <p className="text-xs font-bold text-slate-400 uppercase">Weather Cities</p>
-                <p className="text-2xl font-black text-slate-900">{weatherCities.length}</p>
+              <div className="rounded-xl border p-4 shadow-xs transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                <p className="text-xs font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>Weather Cities</p>
+                <p className="text-2xl font-black transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>{weatherCities.length}</p>
               </div>
             </div>
           </div>
@@ -1600,58 +1233,53 @@ export default function AdminPanel() {
         {/* ==================== STORIES ==================== */}
         {activeTab === "stories" && (
           <div>
-            <h2 className="text-xl font-black text-slate-900 mb-4">Manage Stories</h2>
-            <div className="bg-gradient-to-r from-blue-50 to-slate-50 p-4 rounded-xl border border-blue-200 shadow-xs mb-6">
-              <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><Globe className="w-4 h-4 text-blue-600" />News Extractor</h3>
+            <h2 className="text-xl font-black mb-4 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Manage Stories</h2>
+            <div className="rounded-xl border shadow-xs p-4 mb-6 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <h3 className="text-sm font-bold mb-3 flex items-center gap-2 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}><Globe className="w-4 h-4 text-blue-600" />News Extractor</h3>
               <div className="flex flex-col sm:flex-row gap-3">
-                <input type="url" placeholder="Paste news article URL..." value={extractUrl} onChange={(e) => setExtractUrl(e.target.value)} className="flex-1 text-xs p-2 border border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 bg-white" />
-                <select value={extractedLang} onChange={(e) => setExtractedLang(e.target.value)} className="text-xs p-2 border border-blue-200 rounded-lg focus:outline-none focus:border-blue-500 bg-white">
+                <input type="url" placeholder="Paste news article URL..." value={extractUrl} onChange={(e) => setExtractUrl(e.target.value)} className="flex-1 text-xs p-2 border rounded-lg focus:outline-none focus:border-blue-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} />
+                <select value={extractedLang} onChange={(e) => setExtractedLang(e.target.value)} className="text-xs p-2 border rounded-lg focus:outline-none focus:border-blue-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }}>
                   {LANGUAGES.map(lang => (<option key={lang.code} value={lang.code}>{lang.nativeName} ({lang.name})</option>))}
                 </select>
                 <button onClick={handleExtract} disabled={extracting} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1 disabled:opacity-50 whitespace-nowrap">
                   {extracting ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Extracting</> : <><Upload className="w-3 h-3" /> Extract</>}
                 </button>
               </div>
-              <p className="text-[10px] text-slate-500 mt-2">Select the language of the source article before extracting.</p>
+              <p className="text-[10px] mt-2 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Select the language of the source article before extracting.</p>
               {extractedData && (
-                <div className="mt-3 p-3 bg-white rounded-lg border border-blue-100 text-xs">
+                <div className="mt-3 p-3 rounded-lg border text-xs transition-colors duration-300" style={{ backgroundColor: isDark ? '#1e293b' : '#eff6ff', borderColor: isDark ? darkBorder : '#93c5fd' }}>
                   <p className="font-bold text-green-600">✅ Extracted: {extractedData.title || "Unknown title"}</p>
-                  <p className="text-slate-500 mt-1">🌐 Language: {LANGUAGES.find(l => l.code === extractedLang)?.nativeName}</p>
+                  <p className="mt-1 transition-colors duration-300" style={{ color: isDark ? darkTextSecondary : '#475569' }}>🌐 Language: {LANGUAGES.find(l => l.code === extractedLang)?.nativeName}</p>
                 </div>
               )}
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs mb-6">
-              <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center justify-between">
+            <div className="rounded-xl border shadow-xs p-4 mb-6 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <h3 className="text-sm font-bold mb-3 flex items-center justify-between transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>
                 {editingNews ? "Edit Story" : "Add New Story"}
                 <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={newsForm.featuredInAll}
-                      onChange={(e) => setNewsForm({...newsForm, featuredInAll: e.target.checked})}
-                      className="w-3 h-3 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-                    />
+                  <label className="flex items-center gap-1.5 text-[10px] font-bold cursor-pointer transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>
+                    <input type="checkbox" checked={newsForm.featuredInAll} onChange={(e) => setNewsForm({...newsForm, featuredInAll: e.target.checked})} className="w-3 h-3 rounded border-slate-300 dark:border-[#333333] text-amber-600 focus:ring-amber-500" />
                     Show in All Languages
                   </label>
-                  <span className="text-[10px] font-bold text-slate-500">Primary Language:</span>
-                  <select value={newsForm.language} onChange={(e) => setNewsForm({...newsForm, language: e.target.value})} className="text-xs p-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500 bg-white">
+                  <span className="text-[10px] font-bold transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Primary Language:</span>
+                  <select value={newsForm.language} onChange={(e) => setNewsForm({...newsForm, language: e.target.value})} className="text-xs p-1.5 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }}>
                     {LANGUAGES.map(lang => (<option key={lang.code} value={lang.code}>{lang.nativeName}</option>))}
                   </select>
                 </div>
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <input type="text" placeholder="Story title..." value={newsForm.title} onChange={(e) => setNewsForm({...newsForm, title: e.target.value})} className="text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500 sm:col-span-2" />
-                <select value={newsForm.category} onChange={(e) => setNewsForm({...newsForm, category: e.target.value})} className="text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500">
+                <input type="text" placeholder="Story title..." value={newsForm.title} onChange={(e) => setNewsForm({...newsForm, title: e.target.value})} className="text-xs p-2 border rounded-lg focus:outline-none focus:border-red-500 sm:col-span-2 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} />
+                <select value={newsForm.category} onChange={(e) => setNewsForm({...newsForm, category: e.target.value})} className="text-xs p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }}>
                   {ALL_CATEGORIES.map(cat => (<option key={cat} value={cat}>{cat}</option>))}
                 </select>
-                <input type="text" placeholder="Image URL..." value={newsForm.image} onChange={(e) => setNewsForm({...newsForm, image: e.target.value})} className="text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500 sm:col-span-3" />
-                <textarea placeholder="Full description / content..." value={newsForm.description} onChange={(e) => setNewsForm({...newsForm, description: e.target.value})} className="text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500 sm:col-span-3 h-40" />
+                <input type="text" placeholder="Image URL..." value={newsForm.image} onChange={(e) => setNewsForm({...newsForm, image: e.target.value})} className="text-xs p-2 border rounded-lg focus:outline-none focus:border-red-500 sm:col-span-3 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} />
+                <textarea placeholder="Full description / content..." value={newsForm.description} onChange={(e) => setNewsForm({...newsForm, description: e.target.value})} className="text-xs p-2 border rounded-lg focus:outline-none focus:border-red-500 sm:col-span-3 h-40 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} />
                 {editingNews && (
-                  <div className="sm:col-span-3 border-t border-slate-200 pt-3 mt-2">
+                  <div className="sm:col-span-3 border-t pt-3 mt-2 transition-colors duration-300" style={{ borderColor: isDark ? darkBorder : '#e2e8f0' }}>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-[10px] font-bold text-slate-500">Add Translation:</span>
-                      <select value={translationTargetLang} onChange={(e) => setTranslationTargetLang(e.target.value)} className="text-xs p-1.5 border border-slate-200 rounded">
+                      <span className="text-[10px] font-bold transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Add Translation:</span>
+                      <select value={translationTargetLang} onChange={(e) => setTranslationTargetLang(e.target.value)} className="text-xs p-1.5 border rounded transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }}>
                         {LANGUAGES.filter(l => l.code !== newsForm.language).map(lang => (<option key={lang.code} value={lang.code}>{lang.nativeName}</option>))}
                       </select>
                       <button onClick={handleTranslateNews} disabled={isTranslatingNews || translating} className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-3 py-1 rounded transition flex items-center gap-1 disabled:opacity-50">
@@ -1660,17 +1288,15 @@ export default function AdminPanel() {
                     </div>
                     {Object.keys(newsForm.translations || {}).length > 0 && (
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Saved Translations</label>
-                        <div className="flex flex-wrap gap-2 p-2 border border-green-200 rounded-lg bg-green-50">
+                        <label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Saved Translations</label>
+                        <div className="flex flex-wrap gap-2 p-2 rounded-lg border transition-colors duration-300" style={{ backgroundColor: isDark ? '#064e3b' : '#f0fdf4', borderColor: isDark ? darkBorder : '#86efac' }}>
                           {Object.keys(newsForm.translations).map((code) => {
                             const lang = LANGUAGES.find(l => l.code === code);
-                            return (
-                              <div key={code} className="flex items-center gap-1 bg-white px-2 py-1 rounded border border-green-300">
-                                <span className="text-xs font-bold">{lang?.nativeName || code}</span>
-                                <button onClick={() => openTranslationEditor(code)} className="text-blue-500 hover:text-blue-700 text-[10px]" title="Edit"><Edit2 className="w-3 h-3" /></button>
-                                <button onClick={() => removeTranslation('story', code)} className="text-red-500 hover:text-red-700 text-[10px]" title="Remove"><X className="w-3 h-3" /></button>
-                              </div>
-                            );
+                            return <div key={code} className="flex items-center gap-1 px-2 py-1 rounded border transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#86efac' }}>
+                              <span className="text-xs font-bold transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>{lang?.nativeName || code}</span>
+                              <button onClick={() => openTranslationEditor(code)} className="text-blue-500 hover:text-blue-700 text-[10px]"><Edit2 className="w-3 h-3" /></button>
+                              <button onClick={() => removeTranslation('story', code)} className="text-red-500 hover:text-red-700 text-[10px]"><X className="w-3 h-3" /></button>
+                            </div>;
                           })}
                         </div>
                       </div>
@@ -1678,12 +1304,11 @@ export default function AdminPanel() {
                   </div>
                 )}
                 <div className="flex gap-2 sm:col-span-3">
-                  <select value={newsType} onChange={(e) => setNewsType(e.target.value)} className="text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500">
+                  <select value={newsType} onChange={(e) => setNewsType(e.target.value)} className="text-xs p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }}>
                     <option value="latest">Latest News</option><option value="top">Top Stories</option>
                   </select>
                   {editingNews ? (
-                    <><button onClick={handleUpdateNews} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Update</button>
-                    <button onClick={resetNewsForm} className="bg-slate-600 hover:bg-slate-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition">Cancel</button></>
+                    <><button onClick={handleUpdateNews} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Update</button><button onClick={resetNewsForm} className="bg-slate-600 hover:bg-slate-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition">Cancel</button></>
                   ) : (
                     <button onClick={handleAddNews} className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Plus className="w-3 h-3" /> Add Story</button>
                   )}
@@ -1691,16 +1316,16 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs mb-4">
-              <h3 className="text-sm font-bold text-slate-800 mb-3">Top Stories ({topStories.length})</h3>
+            <div className="rounded-xl border shadow-xs p-4 mb-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <h3 className="text-sm font-bold mb-3 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Top Stories ({topStories.length})</h3>
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {topStories.map((story) => (
-                  <div key={story.id} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs">
-                    <span className="font-medium flex-1 truncate">{story.title}</span>
-                    <span className="text-slate-400 mx-2 hidden sm:inline">{story.category}</span>
-                    <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded mr-1">{LANGUAGES.find(l => l.code === story.language)?.nativeName || story.language || 'en'}</span>
-                    {story.featuredInAll && <span className="text-[8px] font-bold text-amber-500 mr-1">⭐</span>}
-                    {story.translations && Object.keys(story.translations).length > 0 && <span className="text-[8px] font-bold text-green-500 mr-2">+{Object.keys(story.translations).length}</span>}
+                  <div key={story.id} className="flex items-center justify-between p-2 border rounded-lg text-xs transition-colors duration-300" style={{ backgroundColor: isDark ? darkHover : '#f8fafc', borderColor: isDark ? darkBorder : '#f1f5f9' }}>
+                    <span className="font-medium flex-1 truncate transition-colors duration-300" style={{ color: isDark ? darkText : '#1f2937' }}>{story.title}</span>
+                    <span className="mx-2 hidden sm:inline transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>{story.category}</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded mr-1 transition-colors duration-300" style={{ backgroundColor: isDark ? '#1e3a5f' : '#eff6ff', color: isDark ? '#60a5fa' : '#2563eb' }}>{LANGUAGES.find(l => l.code === story.language)?.nativeName || story.language || 'en'}</span>
+                    {story.featuredInAll && <span className="text-[8px] font-bold mr-1 transition-colors duration-300" style={{ color: isDark ? '#fbbf24' : '#d97706' }}>⭐</span>}
+                    {story.translations && Object.keys(story.translations).length > 0 && <span className="text-[8px] font-bold mr-2 transition-colors duration-300" style={{ color: isDark ? '#34d399' : '#10b981' }}>+{Object.keys(story.translations).length}</span>}
                     <div className="flex gap-1">
                       <button onClick={() => handleEditNews(story, "top")} className="text-blue-500 hover:text-blue-700"><Edit2 className="w-4 h-4" /></button>
                       <button onClick={() => handleDeleteNews(story.id, "top")} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
@@ -1710,16 +1335,16 @@ export default function AdminPanel() {
               </div>
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-              <h3 className="text-sm font-bold text-slate-800 mb-3">Latest News ({latestNews.length})</h3>
+            <div className="rounded-xl border shadow-xs p-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <h3 className="text-sm font-bold mb-3 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Latest News ({latestNews.length})</h3>
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {latestNews.map((story) => (
-                  <div key={story.id} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs">
-                    <span className="font-medium flex-1 truncate">{story.title}</span>
-                    <span className="text-slate-400 mx-2 hidden sm:inline">{story.category}</span>
-                    <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded mr-1">{LANGUAGES.find(l => l.code === story.language)?.nativeName || story.language || 'en'}</span>
-                    {story.featuredInAll && <span className="text-[8px] font-bold text-amber-500 mr-1">⭐</span>}
-                    {story.translations && Object.keys(story.translations).length > 0 && <span className="text-[8px] font-bold text-green-500 mr-2">+{Object.keys(story.translations).length}</span>}
+                  <div key={story.id} className="flex items-center justify-between p-2 border rounded-lg text-xs transition-colors duration-300" style={{ backgroundColor: isDark ? darkHover : '#f8fafc', borderColor: isDark ? darkBorder : '#f1f5f9' }}>
+                    <span className="font-medium flex-1 truncate transition-colors duration-300" style={{ color: isDark ? darkText : '#1f2937' }}>{story.title}</span>
+                    <span className="mx-2 hidden sm:inline transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>{story.category}</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded mr-1 transition-colors duration-300" style={{ backgroundColor: isDark ? '#1e3a5f' : '#eff6ff', color: isDark ? '#60a5fa' : '#2563eb' }}>{LANGUAGES.find(l => l.code === story.language)?.nativeName || story.language || 'en'}</span>
+                    {story.featuredInAll && <span className="text-[8px] font-bold mr-1 transition-colors duration-300" style={{ color: isDark ? '#fbbf24' : '#d97706' }}>⭐</span>}
+                    {story.translations && Object.keys(story.translations).length > 0 && <span className="text-[8px] font-bold mr-2 transition-colors duration-300" style={{ color: isDark ? '#34d399' : '#10b981' }}>+{Object.keys(story.translations).length}</span>}
                     <div className="flex gap-1">
                       <button onClick={() => handleEditNews(story, "latest")} className="text-blue-500 hover:text-blue-700"><Edit2 className="w-4 h-4" /></button>
                       <button onClick={() => handleDeleteNews(story.id, "latest")} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
@@ -1734,64 +1359,49 @@ export default function AdminPanel() {
         {/* ==================== VIDEOS ==================== */}
         {activeTab === "videos" && (
           <div>
-            <h2 className="text-xl font-black text-slate-900 mb-4">Manage Videos</h2>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs mb-6">
-              <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center justify-between">
+            <h2 className="text-xl font-black mb-4 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Manage Videos</h2>
+            <div className="rounded-xl border shadow-xs p-4 mb-6 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <h3 className="text-sm font-bold mb-3 flex items-center justify-between transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>
                 {editingVideo ? "Edit Video" : "Add New Video"}
                 <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={videoForm.featuredInAll}
-                      onChange={(e) => setVideoForm({...videoForm, featuredInAll: e.target.checked})}
-                      className="w-3 h-3 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-                    />
+                  <label className="flex items-center gap-1.5 text-[10px] font-bold cursor-pointer transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>
+                    <input type="checkbox" checked={videoForm.featuredInAll} onChange={(e) => setVideoForm({...videoForm, featuredInAll: e.target.checked})} className="w-3 h-3 rounded border-slate-300 dark:border-[#333333] text-amber-600 focus:ring-amber-500" />
                     Show in All Languages
                   </label>
-                  <span className="text-[10px] font-bold text-slate-500">Language:</span>
-                  <select value={videoForm.language} onChange={(e) => setVideoForm({...videoForm, language: e.target.value})} className="text-xs p-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500 bg-white">
+                  <span className="text-[10px] font-bold transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Language:</span>
+                  <select value={videoForm.language} onChange={(e) => setVideoForm({...videoForm, language: e.target.value})} className="text-xs p-1.5 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }}>
                     {LANGUAGES.map(lang => (<option key={lang.code} value={lang.code}>{lang.nativeName}</option>))}
                   </select>
                 </div>
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2 flex gap-2">
-                  <input type="text" placeholder="Video Link..." value={videoForm.link} onChange={(e) => setVideoForm({...videoForm, link: e.target.value})} className="flex-1 text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" />
+                  <input type="text" placeholder="Video Link..." value={videoForm.link} onChange={(e) => setVideoForm({...videoForm, link: e.target.value})} className="flex-1 text-xs p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} />
                   <button onClick={extractVideoTitle} disabled={videoExtractLoading || !videoForm.link.trim()} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-2 rounded-lg transition flex items-center gap-1 whitespace-nowrap disabled:opacity-50"><Video className="w-3 h-3" />{videoExtractLoading ? '...' : 'Extract Title'}</button>
                 </div>
-                <input type="text" placeholder="Video title..." value={videoForm.title} onChange={(e) => setVideoForm({...videoForm, title: e.target.value})} className="text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" />
-                <input type="text" placeholder="Image URL (optional)" value={videoForm.img} onChange={(e) => setVideoForm({...videoForm, img: e.target.value})} className="text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500 sm:col-span-2" />
-                <select value={videoForm.category} onChange={(e) => setVideoForm({...videoForm, category: e.target.value})} className="text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500">
+                <input type="text" placeholder="Video title..." value={videoForm.title} onChange={(e) => setVideoForm({...videoForm, title: e.target.value})} className="text-xs p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} />
+                <input type="text" placeholder="Image URL (optional)" value={videoForm.img} onChange={(e) => setVideoForm({...videoForm, img: e.target.value})} className="text-xs p-2 border rounded-lg focus:outline-none focus:border-red-500 sm:col-span-2 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} />
+                <select value={videoForm.category} onChange={(e) => setVideoForm({...videoForm, category: e.target.value})} className="text-xs p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }}>
                   {ALL_CATEGORIES.map(cat => (<option key={cat} value={cat}>{cat}</option>))}
                 </select>
                 <div className="sm:col-span-3 flex gap-2">
                   {editingVideo ? (
-                    <><button onClick={handleUpdateVideo} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Update</button>
-                    <button onClick={resetVideoForm} className="bg-slate-600 hover:bg-slate-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition">Cancel</button></>
+                    <><button onClick={handleUpdateVideo} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Update</button><button onClick={resetVideoForm} className="bg-slate-600 hover:bg-slate-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition">Cancel</button></>
                   ) : (
                     <button onClick={handleAddVideo} className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Plus className="w-3 h-3" /> Add Video</button>
                   )}
                 </div>
               </div>
             </div>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-              <h3 className="text-sm font-bold text-slate-800 mb-3">Videos ({videos.length})</h3>
+            <div className="rounded-xl border shadow-xs p-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <h3 className="text-sm font-bold mb-3 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Videos ({videos.length})</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {videos.map((video) => (
-                  <div key={video.id} className="flex flex-col gap-2 p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                  <div key={video.id} className="flex flex-col gap-2 p-3 border rounded-lg transition-colors duration-300" style={{ backgroundColor: isDark ? darkHover : '#f8fafc', borderColor: isDark ? darkBorder : '#f1f5f9' }}>
                     <img src={video.img} alt={video.title} className="w-full h-24 object-cover rounded-lg" />
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs font-medium line-clamp-1 flex-1">{video.title}</span>
-                      {video.featuredInAll && <span className="text-[10px]" title="Featured in All Languages">⭐</span>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">{video.category || "Latest"}</span>
-                      <span className="text-[9px] font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">{LANGUAGES.find(l => l.code === video.language)?.nativeName || video.language || 'en'}</span>
-                    </div>
-                    <div className="flex gap-1 justify-end">
-                      <button onClick={() => handleEditVideo(video)} className="text-blue-500 hover:text-blue-700"><Edit2 className="w-4 h-4" /></button>
-                      <button onClick={() => handleDeleteVideo(video.id)} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
-                    </div>
+                    <div className="flex items-center gap-1"><span className="text-xs font-medium line-clamp-1 flex-1 transition-colors duration-300" style={{ color: isDark ? darkText : '#1f2937' }}>{video.title}</span>{video.featuredInAll && <span className="text-[10px]" title="Featured in All Languages">⭐</span>}</div>
+                    <div className="flex items-center gap-2"><span className="text-[9px] font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>{video.category || "Latest"}</span><span className="text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors duration-300" style={{ backgroundColor: isDark ? '#1e3a5f' : '#eff6ff', color: isDark ? '#60a5fa' : '#2563eb' }}>{LANGUAGES.find(l => l.code === video.language)?.nativeName || video.language || 'en'}</span></div>
+                    <div className="flex gap-1 justify-end"><button onClick={() => handleEditVideo(video)} className="text-blue-500 hover:text-blue-700"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleDeleteVideo(video.id)} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button></div>
                   </div>
                 ))}
               </div>
@@ -1802,26 +1412,20 @@ export default function AdminPanel() {
         {/* ==================== SPORTS ==================== */}
         {activeTab === "sports" && (
           <div>
-            <h2 className="text-xl font-black text-slate-900 mb-4">Manage Sports Scores</h2>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs mb-4">
+            <h2 className="text-xl font-black mb-4 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Manage Sports Scores</h2>
+            <div className="rounded-xl border shadow-xs p-4 mb-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-slate-800">Sport Entries</h3>
-                <div className="flex gap-2">
-                  <button onClick={addSport} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1"><Plus className="w-3 h-3" /> Add Sport</button>
-                  <button onClick={saveSportsData} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save All</button>
-                </div>
+                <h3 className="text-sm font-bold transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Sport Entries</h3>
+                <div className="flex gap-2"><button onClick={addSport} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1"><Plus className="w-3 h-3" /> Add Sport</button><button onClick={saveSports} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save All</button></div>
               </div>
               {sports.map((sport, idx) => (
-                <div key={idx} className="p-3 bg-slate-50 border border-slate-100 rounded-lg mb-3">
+                <div key={idx} className="p-3 border rounded-lg mb-3 transition-colors duration-300" style={{ backgroundColor: isDark ? darkHover : '#f8fafc', borderColor: isDark ? darkBorder : '#f1f5f9' }}>
                   <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
-                    <div><label className="block text-[8px] font-black text-slate-500 uppercase">Sport</label><input type="text" value={sport.sport || ""} onChange={(e) => updateSport(idx, 'sport', e.target.value)} className="w-full text-xs p-1 border border-slate-200 rounded" /></div>
-                    <div><label className="block text-[8px] font-black text-slate-500 uppercase">Match</label><input type="text" value={sport.match || ""} onChange={(e) => updateSport(idx, 'match', e.target.value)} className="w-full text-xs p-1 border border-slate-200 rounded" /></div>
-                    <div><label className="block text-[8px] font-black text-slate-500 uppercase">Score</label><input type="text" value={sport.score || ""} onChange={(e) => updateSport(idx, 'score', e.target.value)} className="w-full text-xs p-1 border border-slate-200 rounded" /></div>
-                    <div><label className="block text-[8px] font-black text-slate-500 uppercase">Detail</label><input type="text" value={sport.detail || ""} onChange={(e) => updateSport(idx, 'detail', e.target.value)} className="w-full text-xs p-1 border border-slate-200 rounded" /></div>
-                    <div className="flex flex-col items-center justify-center">
-                      <label className="block text-[8px] font-black text-slate-500 uppercase">Show</label>
-                      <button onClick={() => toggleSportShow(idx)} className={`px-3 py-1 rounded text-xs font-bold transition ${sport.show !== false ? "bg-emerald-600 text-white" : "bg-slate-300 text-slate-600"}`}>{sport.show !== false ? "ON" : "OFF"}</button>
-                    </div>
+                    <div><label className="block text-[8px] font-black uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Sport</label><input type="text" value={sport.sport || ""} onChange={(e) => updateSport(idx, 'sport', e.target.value)} className="w-full text-xs p-1 border rounded transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+                    <div><label className="block text-[8px] font-black uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Match</label><input type="text" value={sport.match || ""} onChange={(e) => updateSport(idx, 'match', e.target.value)} className="w-full text-xs p-1 border rounded transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+                    <div><label className="block text-[8px] font-black uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Score</label><input type="text" value={sport.score || ""} onChange={(e) => updateSport(idx, 'score', e.target.value)} className="w-full text-xs p-1 border rounded transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+                    <div><label className="block text-[8px] font-black uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Detail</label><input type="text" value={sport.detail || ""} onChange={(e) => updateSport(idx, 'detail', e.target.value)} className="w-full text-xs p-1 border rounded transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+                    <div className="flex flex-col items-center justify-center"><label className="block text-[8px] font-black uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Show</label><button onClick={() => toggleSportShow(idx)} className={`px-3 py-1 rounded text-xs font-bold transition ${sport.show !== false ? "bg-emerald-600 text-white" : isDark ? "bg-slate-700 text-slate-300" : "bg-slate-300 text-slate-600"}`}>{sport.show !== false ? "ON" : "OFF"}</button></div>
                   </div>
                   <button onClick={() => removeSport(idx)} className="mt-2 text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1"><Trash2 className="w-3 h-3" /> Remove</button>
                 </div>
@@ -1833,23 +1437,20 @@ export default function AdminPanel() {
         {/* ==================== MARKET ==================== */}
         {activeTab === "market" && (
           <div>
-            <h2 className="text-xl font-black text-slate-900 mb-4">Market Data</h2>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-              <div className="flex justify-between items-center mb-4">
-                <p className="text-xs text-slate-500">Manual entry or auto-fetch</p>
-                <button onClick={autoFetchMarket} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 disabled:opacity-50"><Radio className="w-3 h-3" /> Fetch Live</button>
-              </div>
+            <h2 className="text-xl font-black mb-4 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Market Data</h2>
+            <div className="rounded-xl border shadow-xs p-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <div className="flex justify-between items-center mb-4"><p className="text-xs transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Manual entry or auto-fetch</p><button onClick={autoFetchMarket} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 disabled:opacity-50"><Radio className="w-3 h-3" /> Fetch Live</button></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Sensex Price</label><input type="text" value={market.sensex || ""} onChange={(e) => setMarketState({...market, sensex: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
-                <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Sensex Change</label><input type="text" value={market.sensexChange || ""} onChange={(e) => setMarketState({...market, sensexChange: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
-                <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nifty 50 Price</label><input type="text" value={market.nifty || ""} onChange={(e) => setMarketState({...market, nifty: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
-                <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nifty Change</label><input type="text" value={market.niftyChange || ""} onChange={(e) => setMarketState({...market, niftyChange: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
-                <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">USD/INR</label><input type="text" value={market.usdInr} onChange={(e) => setMarketState({...market, usdInr: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
-                <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">USD Change</label><input type="text" value={market.usdInrChange} onChange={(e) => setMarketState({...market, usdInrChange: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
-                <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Gold Rate</label><input type="text" value={market.goldRate} onChange={(e) => setMarketState({...market, goldRate: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
-                <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Gold Change</label><input type="text" value={market.goldChange} onChange={(e) => setMarketState({...market, goldChange: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
+                <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Sensex Price</label><input type="text" value={market.sensex || ""} onChange={(e) => setMarketState({...market, sensex: e.target.value})} className="w-full text-sm p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+                <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Sensex Change</label><input type="text" value={market.sensexChange || ""} onChange={(e) => setMarketState({...market, sensexChange: e.target.value})} className="w-full text-sm p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+                <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Nifty 50 Price</label><input type="text" value={market.nifty || ""} onChange={(e) => setMarketState({...market, nifty: e.target.value})} className="w-full text-sm p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+                <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Nifty Change</label><input type="text" value={market.niftyChange || ""} onChange={(e) => setMarketState({...market, niftyChange: e.target.value})} className="w-full text-sm p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+                <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>USD/INR</label><input type="text" value={market.usdInr} onChange={(e) => setMarketState({...market, usdInr: e.target.value})} className="w-full text-sm p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+                <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>USD Change</label><input type="text" value={market.usdInrChange} onChange={(e) => setMarketState({...market, usdInrChange: e.target.value})} className="w-full text-sm p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+                <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Gold Rate</label><input type="text" value={market.goldRate} onChange={(e) => setMarketState({...market, goldRate: e.target.value})} className="w-full text-sm p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+                <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Gold Change</label><input type="text" value={market.goldChange} onChange={(e) => setMarketState({...market, goldChange: e.target.value})} className="w-full text-sm p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
               </div>
-              <button onClick={saveMarketDataFn} className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Market Data</button>
+              <button onClick={saveMarket} className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Market Data</button>
             </div>
           </div>
         )}
@@ -1857,35 +1458,26 @@ export default function AdminPanel() {
         {/* ==================== WEATHER ==================== */}
         {activeTab === "weather" && (
           <div>
-            <h2 className="text-xl font-black text-slate-900 mb-4">Weather Data</h2>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-              <div className="flex justify-between items-center mb-4">
-                <p className="text-xs text-slate-500">Manage weather for multiple cities.</p>
-                <button onClick={autoFetchWeather} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 disabled:opacity-50"><Radio className="w-3 h-3" /> Fetch Live</button>
-              </div>
-              <div className="border-b border-slate-200 pb-4 mb-4">
-                <h3 className="text-sm font-bold text-slate-800 mb-3">Default City</h3>
+            <h2 className="text-xl font-black mb-4 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Weather Data</h2>
+            <div className="rounded-xl border shadow-xs p-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <div className="flex justify-between items-center mb-4"><p className="text-xs transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Manage weather for multiple cities.</p><button onClick={autoFetchWeather} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 disabled:opacity-50"><Radio className="w-3 h-3" /> Fetch Live</button></div>
+              <div className="border-b pb-4 mb-4 transition-colors duration-300" style={{ borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                <h3 className="text-sm font-bold mb-3 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Default City</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Temperature</label><input type="text" value={weather.temp} onChange={(e) => setWeatherState({...weather, temp: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
-                  <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">City</label><input type="text" value={weather.city} onChange={(e) => setWeatherState({...weather, city: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
-                  <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Condition</label><input type="text" value={weather.condition} onChange={(e) => setWeatherState({...weather, condition: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" /></div>
+                  <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Temperature</label><input type="text" value={weather.temp} onChange={(e) => setWeatherState({...weather, temp: e.target.value})} className="w-full text-sm p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+                  <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>City</label><input type="text" value={weather.city} onChange={(e) => setWeatherState({...weather, city: e.target.value})} className="w-full text-sm p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+                  <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Condition</label><input type="text" value={weather.condition} onChange={(e) => setWeatherState({...weather, condition: e.target.value})} className="w-full text-sm p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
                 </div>
-                <button onClick={saveWeatherDataFn} className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Default City</button>
+                <button onClick={saveWeather} className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Default City</button>
               </div>
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-bold text-slate-800">City-wise Weather</h3>
-                  <div className="flex gap-2">
-                    <button onClick={addCity} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1"><Plus className="w-3 h-3" /> Add City</button>
-                    <button onClick={saveCitiesData} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Cities</button>
-                  </div>
-                </div>
+                <div className="flex items-center justify-between mb-3"><h3 className="text-sm font-bold transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>City-wise Weather</h3><div className="flex gap-2"><button onClick={addCity} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1"><Plus className="w-3 h-3" /> Add City</button><button onClick={saveCities} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Cities</button></div></div>
                 {weatherCities.map((city, idx) => (
-                  <div key={idx} className="flex items-center gap-3 p-2 bg-slate-50 border border-slate-100 rounded-lg mb-2">
+                  <div key={idx} className="flex items-center gap-3 p-2 border rounded-lg mb-2 transition-colors duration-300" style={{ backgroundColor: isDark ? darkHover : '#f8fafc', borderColor: isDark ? darkBorder : '#f1f5f9' }}>
                     <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <input type="text" placeholder="City name" value={city.city || ""} onChange={(e) => updateCity(idx, 'city', e.target.value)} className="text-xs p-1 border border-slate-200 rounded" />
-                      <input type="text" placeholder="Temperature" value={city.temp || ""} onChange={(e) => updateCity(idx, 'temp', e.target.value)} className="text-xs p-1 border border-slate-200 rounded" />
-                      <input type="text" placeholder="Condition" value={city.condition || ""} onChange={(e) => updateCity(idx, 'condition', e.target.value)} className="text-xs p-1 border border-slate-200 rounded" />
+                      <input type="text" placeholder="City name" value={city.city || ""} onChange={(e) => updateCity(idx, 'city', e.target.value)} className="text-xs p-1 border rounded transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} />
+                      <input type="text" placeholder="Temperature" value={city.temp || ""} onChange={(e) => updateCity(idx, 'temp', e.target.value)} className="text-xs p-1 border rounded transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} />
+                      <input type="text" placeholder="Condition" value={city.condition || ""} onChange={(e) => updateCity(idx, 'condition', e.target.value)} className="text-xs p-1 border rounded transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} />
                     </div>
                     <button onClick={() => removeCity(idx)} className="text-red-500 hover:text-red-700 text-xs"><Trash2 className="w-4 h-4" /></button>
                   </div>
@@ -1898,223 +1490,72 @@ export default function AdminPanel() {
         {/* ==================== ELECTION ==================== */}
         {activeTab === "election" && (
           <div>
-            <h2 className="text-xl font-black text-slate-900 mb-4">Election Data</h2>
-            <p className="text-xs text-slate-500 mb-4">
-              Each state has its own independent party list. Parties can be added, removed, or renamed per state.
-            </p>
-
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs mb-4">
+            <h2 className="text-xl font-black mb-4 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Election Data</h2>
+            <p className="text-xs mb-4 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Each state has its own independent party list. Parties can be added, removed, or renamed per state.</p>
+            <div className="rounded-xl border shadow-xs p-4 mb-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
               <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-bold text-slate-700">Show Election Section:</label>
-                  <button onClick={toggleElectionVisibilityData} className={`px-3 py-1 rounded-lg text-xs font-bold transition ${electionVisible ? "bg-emerald-600 text-white" : "bg-slate-300 text-slate-600"}`}>
-                    {electionVisible ? "ON" : "OFF"}
-                  </button>
-                </div>
-                {!electionVisible && (
-                  <div className="flex-1 flex items-center gap-2">
-                    <input type="text" placeholder="No election message..." value={noElectionMessage} onChange={(e) => setNoElectionMessageState(e.target.value)} className="flex-1 text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" />
-                    <button onClick={saveNoElectionMessageData} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-lg transition">Save Message</button>
-                  </div>
-                )}
-                <button onClick={autoFetchElection} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 disabled:opacity-50">
-                  <Radio className="w-3 h-3" /> Fetch Live
-                </button>
+                <div className="flex items-center gap-2"><label className="text-xs font-bold transition-colors duration-300" style={{ color: isDark ? darkTextSecondary : '#475569' }}>Show Election Section:</label><button onClick={toggleElectionVisibility} className={`px-3 py-1 rounded-lg text-xs font-bold transition ${electionVisible ? "bg-emerald-600 text-white" : isDark ? "bg-slate-700 text-slate-300" : "bg-slate-300 text-slate-600"}`}>{electionVisible ? "ON" : "OFF"}</button></div>
+                {!electionVisible && <div className="flex-1 flex items-center gap-2"><input type="text" placeholder="No election message..." value={noElectionMessage} onChange={(e) => setNoElectionMessageState(e.target.value)} className="flex-1 text-xs p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /><button onClick={saveNoElectionMessage} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-lg transition">Save Message</button></div>}
+                <button onClick={autoFetchElection} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 disabled:opacity-50"><Radio className="w-3 h-3" /> Fetch Live</button>
               </div>
             </div>
-
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs mb-4">
-              <h3 className="text-sm font-bold text-slate-800 mb-3">Election Settings</h3>
+            <div className="rounded-xl border shadow-xs p-4 mb-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <h3 className="text-sm font-bold mb-3 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Election Settings</h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Title</label>
-                  <input type="text" value={electionConfig.title} onChange={(e) => setElectionConfigState({...electionConfig, title: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="e.g., Election Center 2026" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Map Title</label>
-                  <input type="text" value={electionConfig.liveMapTitle} onChange={(e) => setElectionConfigState({...electionConfig, liveMapTitle: e.target.value})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="e.g., Live Results Map" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Default Total Seats</label>
-                  <input type="number" value={electionConfig.totalSeats} onChange={(e) => setElectionConfigState({...electionConfig, totalSeats: Number(e.target.value)})} className="w-full text-sm p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" placeholder="e.g., 403" />
-                </div>
+                <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Title</label><input type="text" value={electionConfig.title} onChange={(e) => setElectionConfigState({...electionConfig, title: e.target.value})} className="w-full text-sm p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} placeholder="e.g., Election Center 2026" /></div>
+                <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Map Title</label><input type="text" value={electionConfig.liveMapTitle} onChange={(e) => setElectionConfigState({...electionConfig, liveMapTitle: e.target.value})} className="w-full text-sm p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} placeholder="e.g., Live Results Map" /></div>
+                <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Default Total Seats</label><input type="number" value={electionConfig.totalSeats} onChange={(e) => setElectionConfigState({...electionConfig, totalSeats: Number(e.target.value)})} className="w-full text-sm p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} placeholder="e.g., 403" /></div>
               </div>
-              <button onClick={saveElectionConfigData} className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Config</button>
+              <button onClick={saveElectionConfig} className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save Config</button>
             </div>
-
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-slate-800">State-wise Management</h3>
-                <div className="flex gap-2">
-                  <button onClick={addElectionState} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1"><Plus className="w-3 h-3" /> Add State</button>
-                  <button onClick={saveElectionStatesData} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save All States</button>
-                </div>
-              </div>
-
+            <div className="rounded-xl border shadow-xs p-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <div className="flex items-center justify-between mb-4"><h3 className="text-sm font-bold transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>State-wise Management</h3><div className="flex gap-2"><button onClick={addElectionState} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1"><Plus className="w-3 h-3" /> Add State</button><button onClick={saveElectionStates} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1 rounded-lg transition flex items-center gap-1"><Save className="w-3 h-3" /> Save All States</button></div></div>
               <div className="space-y-6 max-h-[600px] overflow-y-auto">
                 {electionStates.map((state, stateIdx) => {
                   const totalSeats = state.totalSeats || electionConfig.totalSeats || 0;
                   return (
-                    <div key={stateIdx} className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div key={stateIdx} className="p-4 border rounded-xl transition-colors duration-300" style={{ backgroundColor: isDark ? darkHover : '#f8fafc', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
                       <div className="flex items-center gap-3 mb-4">
-                        <input 
-                          type="text" 
-                          value={state.name || ""} 
-                          onChange={(e) => updateElectionStateField(stateIdx, 'name', e.target.value)} 
-                          className="text-sm font-black p-2 border border-slate-300 rounded-lg focus:outline-none focus:border-red-500 flex-1" 
-                          placeholder="State name (e.g., Uttar Pradesh)" 
-                        />
-                        <div className="flex items-center gap-2">
-                          <label className="text-[10px] font-bold text-slate-500">Total Seats:</label>
-                          <input 
-                            type="number" 
-                            value={state.totalSeats || 0} 
-                            onChange={(e) => updateElectionStateField(stateIdx, 'totalSeats', Number(e.target.value))} 
-                            className="text-xs font-bold p-2 border border-slate-300 rounded-lg w-20 text-center focus:outline-none focus:border-red-500" 
-                            placeholder="Total"
-                          />
-                        </div>
-                        <button 
-                          onClick={() => removeElectionState(stateIdx)} 
-                          className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition"
-                          title="Remove state"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <input type="text" value={state.name || ""} onChange={(e) => updateElectionStateField(stateIdx, 'name', e.target.value)} className="text-sm font-black p-2 border rounded-lg focus:outline-none focus:border-red-500 flex-1 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} placeholder="State name (e.g., Uttar Pradesh)" />
+                        <div className="flex items-center gap-2"><label className="text-[10px] font-bold transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Total Seats:</label><input type="number" value={state.totalSeats || 0} onChange={(e) => updateElectionStateField(stateIdx, 'totalSeats', Number(e.target.value))} className="text-xs font-bold p-2 border rounded-lg w-20 text-center focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} placeholder="Total" /></div>
+                        <button onClick={() => removeElectionState(stateIdx)} className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition"><Trash2 className="w-4 h-4" /></button>
                       </div>
-
                       <div className="mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase">Parties &amp; Seats</label>
-                          <button 
-                            onClick={() => addPartyToState(stateIdx)}
-                            className="text-blue-600 hover:text-blue-700 text-[10px] font-bold flex items-center gap-1"
-                          >
-                            <Plus className="w-3 h-3" /> Add Party
-                          </button>
-                        </div>
+                        <div className="flex items-center justify-between mb-2"><label className="text-[10px] font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Parties &amp; Seats</label><button onClick={() => addPartyToState(stateIdx)} className="text-blue-600 hover:text-blue-700 text-[10px] font-bold flex items-center gap-1"><Plus className="w-3 h-3" /> Add Party</button></div>
                         <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(120px, 1fr))` }}>
                           {state.parties.map((party, partyIdx) => {
                             const seats = state[party.key] || 0;
                             return (
-                              <div key={party.key} className="bg-white border border-slate-200 rounded-lg p-3">
+                              <div key={party.key} className="border rounded-lg p-3 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
                                 <div className="flex items-center justify-between mb-1">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: fillColorMap[party.color] || '#94a3b8' }}></span>
-                                    <input 
-                                      type="text" 
-                                      value={party.name} 
-                                      onChange={(e) => updatePartyInState(stateIdx, partyIdx, 'name', e.target.value)}
-                                      className="text-[10px] font-bold p-0.5 border border-slate-200 rounded w-14 focus:outline-none focus:border-red-500 bg-transparent"
-                                    />
-                                  </div>
-                                  {state.parties.length > 1 && (
-                                    <button 
-                                      onClick={() => removePartyFromState(stateIdx, partyIdx)}
-                                      className="text-red-500 hover:text-red-700"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  )}
+                                  <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: fillColorMap[party.color] || '#94a3b8' }}></span><input type="text" value={party.name} onChange={(e) => updatePartyInState(stateIdx, partyIdx, 'name', e.target.value)} className="text-[10px] font-bold p-0.5 border rounded w-14 focus:outline-none focus:border-red-500 bg-transparent transition-colors duration-300" style={{ borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+                                  {state.parties.length > 1 && <button onClick={() => removePartyFromState(stateIdx, partyIdx)} className="text-red-500 hover:text-red-700"><X className="w-3 h-3" /></button>}
                                 </div>
-                                <input 
-                                  type="number" 
-                                  value={seats} 
-                                  onChange={(e) => updateElectionStateSeat(stateIdx, party.key, Number(e.target.value))}
-                                  className="w-full text-lg font-black text-center p-1 border border-slate-200 rounded focus:outline-none focus:border-red-500" 
-                                  min="0"
-                                />
-                                <select
-                                  value={party.color}
-                                  onChange={(e) => updatePartyInState(stateIdx, partyIdx, 'color', e.target.value)}
-                                  className="text-[8px] w-full mt-1 p-0.5 border border-slate-200 rounded"
-                                >
-                                  <option value="orange">🟠 Orange</option>
-                                  <option value="red">🔴 Red</option>
-                                  <option value="sky">🔵 Sky</option>
-                                  <option value="slate">⚫ Slate</option>
-                                  <option value="green">🟢 Green</option>
-                                  <option value="purple">🟣 Purple</option>
-                                  <option value="yellow">🟡 Yellow</option>
-                                  <option value="pink">🌸 Pink</option>
-                                  <option value="blue">💙 Blue</option>
-                                </select>
-                                <div className="text-[9px] font-bold text-slate-400 mt-1 text-center">
-                                  {totalSeats > 0 ? ((seats / totalSeats) * 100).toFixed(1) : 0}%
-                                </div>
-                                <div className="mt-1">
-                                  <input 
-                                    type="text" 
-                                    value={party.key} 
-                                    onChange={(e) => updatePartyInState(stateIdx, partyIdx, 'key', e.target.value)}
-                                    className="text-[8px] w-full p-0.5 border border-slate-200 rounded text-slate-400 bg-slate-50 focus:outline-none focus:border-red-500"
-                                    placeholder="key"
-                                  />
-                                </div>
+                                <input type="number" value={seats} onChange={(e) => updateElectionStateSeat(stateIdx, party.key, Number(e.target.value))} className="w-full text-lg font-black text-center p-1 border rounded focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} min="0" />
+                                <select value={party.color} onChange={(e) => updatePartyInState(stateIdx, partyIdx, 'color', e.target.value)} className="text-[8px] w-full mt-1 p-0.5 border rounded transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }}><option value="orange">🟠 Orange</option><option value="red">🔴 Red</option><option value="sky">🔵 Sky</option><option value="slate">⚫ Slate</option><option value="green">🟢 Green</option><option value="purple">🟣 Purple</option><option value="yellow">🟡 Yellow</option><option value="pink">🌸 Pink</option><option value="blue">💙 Blue</option></select>
+                                <div className="text-[9px] font-bold mt-1 text-center transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>{totalSeats > 0 ? ((seats / totalSeats) * 100).toFixed(1) : 0}%</div>
+                                <div className="mt-1"><input type="text" value={party.key} onChange={(e) => updatePartyInState(stateIdx, partyIdx, 'key', e.target.value)} className="text-[8px] w-full p-0.5 border rounded transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#f8fafc', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkTextMuted : '#94a3b8' }} placeholder="key" /></div>
                               </div>
                             );
                           })}
                         </div>
                       </div>
-
-                      <div className="mb-3">
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">State Notes</label>
-                        <textarea 
-                          value={state.notes || ""} 
-                          onChange={(e) => updateElectionStateField(stateIdx, 'notes', e.target.value)} 
-                          className="w-full text-xs p-2 border border-slate-300 rounded-lg focus:outline-none focus:border-red-500 h-16" 
-                          placeholder="Add notes about this state (e.g., Key battleground regions, historical context...)"
-                        />
-                      </div>
-
+                      <div className="mb-3"><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>State Notes</label><textarea value={state.notes || ""} onChange={(e) => updateElectionStateField(stateIdx, 'notes', e.target.value)} className="w-full text-xs p-2 border rounded-lg focus:outline-none focus:border-red-500 h-16 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} placeholder="Add notes about this state (e.g., Key battleground regions, historical context...)" /></div>
                       <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase">Reference Links</label>
-                          <button 
-                            onClick={() => addLinkToState(stateIdx)}
-                            className="text-blue-600 hover:text-blue-700 text-[10px] font-bold flex items-center gap-1"
-                          >
-                            <Plus className="w-3 h-3" /> Add Link
-                          </button>
-                        </div>
+                        <div className="flex items-center justify-between mb-2"><label className="block text-[10px] font-bold uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Reference Links</label><button onClick={() => addLinkToState(stateIdx)} className="text-blue-600 hover:text-blue-700 text-[10px] font-bold flex items-center gap-1"><Plus className="w-3 h-3" /> Add Link</button></div>
                         {(state.links || []).map((link: any, linkIdx: number) => (
                           <div key={linkIdx} className="flex items-center gap-2 mb-2">
-                            <input 
-                              type="text" 
-                              value={link.title || ""} 
-                              onChange={(e) => updateStateLink(stateIdx, linkIdx, 'title', e.target.value)}
-                              className="flex-1 text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" 
-                              placeholder="Link title (e.g., Official Results)" 
-                            />
-                            <input 
-                              type="text" 
-                              value={link.url || ""} 
-                              onChange={(e) => updateStateLink(stateIdx, linkIdx, 'url', e.target.value)}
-                              className="flex-1 text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500" 
-                              placeholder="URL (https://...)" 
-                            />
-                            <button 
-                              onClick={() => removeStateLink(stateIdx, linkIdx)}
-                              className="text-red-500 hover:text-red-700 p-1"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
+                            <input type="text" value={link.title || ""} onChange={(e) => updateStateLink(stateIdx, linkIdx, 'title', e.target.value)} className="flex-1 text-xs p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} placeholder="Link title (e.g., Official Results)" />
+                            <input type="text" value={link.url || ""} onChange={(e) => updateStateLink(stateIdx, linkIdx, 'url', e.target.value)} className="flex-1 text-xs p-2 border rounded-lg focus:outline-none focus:border-red-500 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} placeholder="URL (https://...)" />
+                            <button onClick={() => removeStateLink(stateIdx, linkIdx)} className="text-red-500 hover:text-red-700 p-1"><X className="w-3 h-3" /></button>
                           </div>
                         ))}
-                        {(state.links || []).length === 0 && (
-                          <p className="text-[10px] text-slate-400">No reference links added for this state.</p>
-                        )}
+                        {(state.links || []).length === 0 && <p className="text-[10px] transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>No reference links added for this state.</p>}
                       </div>
                     </div>
                   );
                 })}
-                
-                {electionStates.length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-sm text-slate-400">No states added yet.</p>
-                    <button onClick={addElectionState} className="mt-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1 mx-auto"><Plus className="w-3 h-3" /> Add First State</button>
-                  </div>
-                )}
+                {electionStates.length === 0 && <div className="text-center py-8"><p className="text-sm transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>No states added yet.</p><button onClick={addElectionState} className="mt-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1 mx-auto"><Plus className="w-3 h-3" /> Add First State</button></div>}
               </div>
             </div>
           </div>
@@ -2123,53 +1564,44 @@ export default function AdminPanel() {
         {/* ==================== TICKER ==================== */}
         {activeTab === "ticker" && (
           <div>
-            <h2 className="text-xl font-black text-slate-900 mb-4">Manage Ticker Items</h2>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs mb-6">
-              <h3 className="text-sm font-bold text-slate-800 mb-3">Add Ticker</h3>
-              <div className="flex gap-3">
-                <input type="text" placeholder="Ticker text..." value={newTickerText} onChange={(e) => setNewTickerText(e.target.value)} className="flex-1 text-xs p-2 border border-slate-200 rounded-lg" />
-                <button onClick={handleAddTicker} className="bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1"><Plus className="w-3 h-3" /> Add</button>
-              </div>
+            <h2 className="text-xl font-black mb-4 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Manage Ticker Items</h2>
+            <div className="rounded-xl border shadow-xs p-4 mb-6 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <h3 className="text-sm font-bold mb-3 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Add Ticker</h3>
+              <div className="flex gap-3"><input type="text" placeholder="Ticker text..." value={newTickerText} onChange={(e) => setNewTickerText(e.target.value)} className="flex-1 text-xs p-2 border rounded-lg transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /><button onClick={handleAddTicker} className="bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1"><Plus className="w-3 h-3" /> Add</button></div>
             </div>
             {editingTicker && (
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs mb-6">
-                <h3 className="text-sm font-bold text-slate-800 mb-3">Edit: {editingTicker.text}</h3>
+              <div className="rounded-xl border shadow-xs p-4 mb-6 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                <h3 className="text-sm font-bold mb-3 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Edit: {editingTicker.text}</h3>
                 <div className="space-y-4">
-                  <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Text</label><input type="text" value={tickerForm.text} onChange={(e) => setTickerForm({...tickerForm, text: e.target.value})} className="w-full text-xs p-2 border border-slate-200 rounded-lg" /></div>
-                  <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Active</label><button onClick={() => setTickerForm({...tickerForm, active: !tickerForm.active})} className={`px-3 py-1 rounded text-xs font-bold ${tickerForm.active ? "bg-emerald-600 text-white" : "bg-slate-300 text-slate-600"}`}>{tickerForm.active ? "ON" : "OFF"}</button></div>
-                  <div className="border-t pt-3">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Filter Content</label>
-                    <div className="flex gap-3 mb-3">
-                      <select value={tickerLinkLang} onChange={(e) => setTickerLinkLang(e.target.value)} className="text-xs p-2 border border-slate-200 rounded-lg"><option value="">All Languages</option>{LANGUAGES.map(l => (<option key={l.code} value={l.code}>{l.nativeName}</option>))}</select>
-                      <select value={tickerLinkCat} onChange={(e) => setTickerLinkCat(e.target.value)} className="text-xs p-2 border border-slate-200 rounded-lg"><option value="">All Categories</option>{ALL_CATEGORIES.map(c => (<option key={c} value={c}>{c}</option>))}</select>
-                    </div>
+                  <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Text</label><input type="text" value={tickerForm.text} onChange={(e) => setTickerForm({...tickerForm, text: e.target.value})} className="w-full text-xs p-2 border rounded-lg transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+                  <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Active</label><button onClick={() => setTickerForm({...tickerForm, active: !tickerForm.active})} className={`px-3 py-1 rounded text-xs font-bold ${tickerForm.active ? "bg-emerald-600 text-white" : isDark ? "bg-slate-700 text-slate-300" : "bg-slate-300 text-slate-600"}`}>{tickerForm.active ? "ON" : "OFF"}</button></div>
+                  <div className="border-t pt-3 transition-colors duration-300" style={{ borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+                    <label className="block text-[10px] font-bold uppercase mb-2 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Filter Content</label>
+                    <div className="flex gap-3 mb-3"><select value={tickerLinkLang} onChange={(e) => setTickerLinkLang(e.target.value)} className="text-xs p-2 border rounded-lg transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }}><option value="">All Languages</option>{LANGUAGES.map(l => (<option key={l.code} value={l.code}>{l.nativeName}</option>))}</select><select value={tickerLinkCat} onChange={(e) => setTickerLinkCat(e.target.value)} className="text-xs p-2 border rounded-lg transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }}><option value="">All Categories</option>{ALL_CATEGORIES.map(c => (<option key={c} value={c}>{c}</option>))}</select></div>
                   </div>
                   {['stories','latest','videos'].map(type => (
                     <div key={type}>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Linked {type === 'stories' ? 'Top Stories' : type === 'latest' ? 'Latest News' : 'Videos'}</label>
-                      <div className="flex flex-wrap gap-2 p-2 border border-slate-200 rounded-lg max-h-40 overflow-y-auto">
+                      <label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Linked {type === 'stories' ? 'Top Stories' : type === 'latest' ? 'Latest News' : 'Videos'}</label>
+                      <div className="flex flex-wrap gap-2 p-2 border rounded-lg max-h-40 overflow-y-auto transition-colors duration-300" style={{ backgroundColor: isDark ? darkHover : '#f8fafc', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
                         {(type === 'stories' ? getFilteredTopStories() : type === 'latest' ? getFilteredLatestNews() : getFilteredVideos()).map((item: any) => (
-                          <button key={item.id} onClick={() => toggleLinkedItem(type as 'stories'|'latest'|'videos', item.id)} className={`text-xs px-3 py-1 rounded-full transition ${tickerForm[type === 'stories' ? 'linkedStories' : type === 'latest' ? 'linkedLatest' : 'linkedVideos'].includes(item.id) ? "bg-red-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                          <button key={item.id} onClick={() => toggleLinkedItem(type as 'stories'|'latest'|'videos', item.id)} className={`text-xs px-3 py-1 rounded-full transition ${tickerForm[type === 'stories' ? 'linkedStories' : type === 'latest' ? 'linkedLatest' : 'linkedVideos'].includes(item.id) ? "bg-red-600 text-white" : isDark ? "bg-[#2d2d2d] text-[#c8c8c8] hover:bg-[#3d3d3d]" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
                             {item.title?.substring(0,25)}{item.title?.length > 25 ? '...' : ''}
                           </button>
                         ))}
                       </div>
                     </div>
                   ))}
-                  <div className="flex gap-2">
-                    <button onClick={handleUpdateTicker} className="bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1"><Save className="w-3 h-3" /> Update</button>
-                    <button onClick={resetTickerForm} className="bg-slate-600 text-white font-bold text-xs px-4 py-2 rounded-lg">Cancel</button>
-                  </div>
+                  <div className="flex gap-2"><button onClick={handleUpdateTicker} className="bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1"><Save className="w-3 h-3" /> Update</button><button onClick={resetTickerForm} className="bg-slate-600 text-white font-bold text-xs px-4 py-2 rounded-lg">Cancel</button></div>
                 </div>
               </div>
             )}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-              <h3 className="text-sm font-bold text-slate-800 mb-3">Ticker Items ({ticker.length})</h3>
+            <div className="rounded-xl border shadow-xs p-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <h3 className="text-sm font-bold mb-3 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Ticker Items ({ticker.length})</h3>
               <div className="flex flex-wrap gap-2">
                 {ticker.map((item) => (
-                  <div key={item.id} className="flex items-center gap-1 bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5 text-xs">
-                    <span className={item.active === false ? 'text-slate-400 line-through' : ''}>{item.text}</span>
-                    {item.linkedStories?.length > 0 && <span className="text-[8px] font-bold text-blue-500 bg-blue-50 px-1 rounded">📰{item.linkedStories.length}</span>}
+                  <div key={item.id} className="flex items-center gap-1 border rounded-lg px-3 py-1.5 text-xs transition-colors duration-300" style={{ backgroundColor: isDark ? darkHover : '#f8fafc', borderColor: isDark ? darkBorder : '#f1f5f9' }}>
+                    <span className={item.active === false ? 'text-slate-400 line-through' : ''} style={{ color: isDark ? darkTextMuted : '#64748b' }}>{item.text}</span>
+                    {item.linkedStories?.length > 0 && <span className="text-[8px] font-bold px-1 rounded transition-colors duration-300" style={{ backgroundColor: isDark ? '#1e3a5f' : '#eff6ff', color: isDark ? '#60a5fa' : '#2563eb' }}>📰{item.linkedStories.length}</span>}
                     <button onClick={() => handleEditTicker(item)} className="text-blue-500 ml-1"><Edit2 className="w-3 h-3" /></button>
                     <button onClick={() => handleDeleteTicker(item.id)} className="text-red-500"><Trash2 className="w-3 h-3" /></button>
                   </div>
@@ -2182,75 +1614,63 @@ export default function AdminPanel() {
         {/* ==================== TV CHANNELS ==================== */}
         {activeTab === "tv" && (
           <div>
-            <h2 className="text-xl font-black text-slate-900 mb-4">TV Channels</h2>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs mb-6">
-              <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center justify-between">
+            <h2 className="text-xl font-black mb-4 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>TV Channels</h2>
+            <div className="rounded-xl border shadow-xs p-4 mb-6 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <h3 className="text-sm font-bold mb-3 flex items-center justify-between transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>
                 {editingChannel ? "Edit Channel" : "Add TV Channel"}
                 <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={channelForm.featuredInAll}
-                      onChange={(e) => setChannelForm({...channelForm, featuredInAll: e.target.checked})}
-                      className="w-3 h-3 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-                    />
+                  <label className="flex items-center gap-1.5 text-[10px] font-bold cursor-pointer transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>
+                    <input type="checkbox" checked={channelForm.featuredInAll} onChange={(e) => setChannelForm({...channelForm, featuredInAll: e.target.checked})} className="w-3 h-3 rounded border-slate-300 dark:border-[#333333] text-amber-600 focus:ring-amber-500" />
                     Show in All Languages
                   </label>
-                  <span className="text-[10px] font-bold text-slate-500">Language:</span>
-                  <select value={channelForm.language} onChange={(e) => setChannelForm({...channelForm, language: e.target.value})} className="text-xs p-1.5 border border-slate-200 rounded-lg bg-white">
+                  <span className="text-[10px] font-bold transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Language:</span>
+                  <select value={channelForm.language} onChange={(e) => setChannelForm({...channelForm, language: e.target.value})} className="text-xs p-1.5 border rounded-lg transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }}>
                     {LANGUAGES.map(lang => (<option key={lang.code} value={lang.code}>{lang.nativeName}</option>))}
                   </select>
                 </div>
               </h3>
               <div className="grid grid-cols-1 gap-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <input type="text" placeholder="Channel name..." value={channelForm.name} onChange={(e) => setChannelForm({...channelForm, name: e.target.value})} className="text-xs p-2 border border-slate-200 rounded-lg" />
-                  <input type="text" placeholder="Logo URL..." value={channelForm.logo} onChange={(e) => setChannelForm({...channelForm, logo: e.target.value})} className="text-xs p-2 border border-slate-200 rounded-lg" />
+                  <input type="text" placeholder="Channel name..." value={channelForm.name} onChange={(e) => setChannelForm({...channelForm, name: e.target.value})} className="text-xs p-2 border rounded-lg transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} />
+                  <input type="text" placeholder="Logo URL..." value={channelForm.logo} onChange={(e) => setChannelForm({...channelForm, logo: e.target.value})} className="text-xs p-2 border rounded-lg transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Stream URLs</label>
+                  <label className="block text-[10px] font-bold uppercase mb-2 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Stream URLs</label>
                   {channelForm.urls.map((url, i) => (
                     <div key={i} className="flex items-center gap-2 mb-2">
-                      <input type="text" placeholder={`URL ${i + 1}...`} value={url} onChange={(e) => updateChannelUrl(i, e.target.value)} className="flex-1 text-xs p-2 border border-slate-200 rounded-lg" />
-                      {i === 0 && <span className="text-[8px] font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">Primary</span>}
+                      <input type="text" placeholder={`URL ${i + 1}...`} value={url} onChange={(e) => updateChannelUrl(i, e.target.value)} className="flex-1 text-xs p-2 border rounded-lg transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} />
+                      {i === 0 && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded transition-colors duration-300" style={{ backgroundColor: isDark ? '#1e3a5f' : '#eff6ff', color: isDark ? '#60a5fa' : '#2563eb' }}>Primary</span>}
                       {channelForm.urls.length > 1 && <button onClick={() => removeChannelUrl(i)} className="text-red-500"><MinusCircle className="w-4 h-4" /></button>}
                     </div>
                   ))}
                   <button onClick={addChannelUrl} className="text-blue-600 text-xs font-bold flex items-center gap-1 mt-1"><PlusCircle className="w-3 h-3" /> Add Backup URL</button>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Type (auto-detected)</label>
+                  <label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Type (auto-detected)</label>
                   <span className={`text-xs font-bold px-2 py-1 rounded ${channelForm.type === 'youtube' ? 'bg-red-100 text-red-700' : channelForm.type === 'hls' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
                     {channelForm.type === 'youtube' ? '🎬 YouTube' : channelForm.type === 'hls' ? '📡 HLS' : '🌐 Iframe'}
                   </span>
                 </div>
                 <div className="flex gap-2">
                   {editingChannel ? (
-                    <><button onClick={handleUpdateChannel} className="bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1"><Save className="w-3 h-3" /> Update</button>
-                    <button onClick={resetChannelForm} className="bg-slate-600 text-white font-bold text-xs px-4 py-2 rounded-lg">Cancel</button></>
+                    <><button onClick={handleUpdateChannel} className="bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1"><Save className="w-3 h-3" /> Update</button><button onClick={resetChannelForm} className="bg-slate-600 text-white font-bold text-xs px-4 py-2 rounded-lg">Cancel</button></>
                   ) : (
                     <button onClick={handleAddChannel} className="bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1"><Plus className="w-3 h-3" /> Add Channel</button>
                   )}
                 </div>
               </div>
             </div>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-              <h3 className="text-sm font-bold text-slate-800 mb-3">Channels ({tvChannels.length})</h3>
+            <div className="rounded-xl border shadow-xs p-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <h3 className="text-sm font-bold mb-3 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Channels ({tvChannels.length})</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {tvChannels.map((channel) => (
-                  <div key={channel.id} className="flex flex-col items-center p-3 bg-slate-50 border border-slate-100 rounded-lg">
-                    {channel.logo?.startsWith('http') ? <img src={channel.logo} alt={channel.name} className="w-14 h-14 rounded-full object-cover border-2 border-slate-200" /> : <div className="w-14 h-14 bg-slate-200 rounded-full flex items-center justify-center font-black text-sm">{channel.logo || channel.name?.substring(0,2).toUpperCase()}</div>}
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className="text-xs font-medium text-center">{channel.name}</span>
-                      {channel.featuredInAll && <span className="text-[10px]">⭐</span>}
-                    </div>
-                    <span className="text-[9px] font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded mt-1">{LANGUAGES.find(l => l.code === channel.language)?.nativeName || channel.language || 'en'}</span>
-                    <span className="text-[8px] text-slate-400 uppercase">{channel.type}</span>
-                    {channel.urls?.length > 1 && <span className="text-[8px] font-bold text-amber-500">🔗 +{channel.urls.length - 1}</span>}
-                    <div className="flex gap-1 mt-1">
-                      <button onClick={() => handleEditChannel(channel)} className="text-blue-500"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDeleteChannel(channel.id)} className="text-red-500"><Trash2 className="w-3 h-3" /></button>
-                    </div>
+                  <div key={channel.id} className="flex flex-col items-center p-3 border rounded-lg transition-colors duration-300" style={{ backgroundColor: isDark ? darkHover : '#f8fafc', borderColor: isDark ? darkBorder : '#f1f5f9' }}>
+                    {channel.logo?.startsWith('http') ? <img src={channel.logo} alt={channel.name} className="w-14 h-14 rounded-full object-cover border-2 border-slate-200" /> : <div className="w-14 h-14 rounded-full flex items-center justify-center font-black text-sm transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#e2e8f0', color: isDark ? darkTextMuted : '#94a3b8' }}>{channel.logo || channel.name?.substring(0,2).toUpperCase()}</div>}
+                    <div className="flex items-center gap-1 mt-1"><span className="text-xs font-medium text-center transition-colors duration-300" style={{ color: isDark ? darkText : '#1f2937' }}>{channel.name}</span>{channel.featuredInAll && <span className="text-[10px]">⭐</span>}</div>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded mt-1 transition-colors duration-300" style={{ backgroundColor: isDark ? '#1e3a5f' : '#eff6ff', color: isDark ? '#60a5fa' : '#2563eb' }}>{LANGUAGES.find(l => l.code === channel.language)?.nativeName || channel.language || 'en'}</span>
+                    <span className="text-[8px] uppercase transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#94a3b8' }}>{channel.type}</span>
+                    {channel.urls?.length > 1 && <span className="text-[8px] font-bold transition-colors duration-300" style={{ color: isDark ? '#fbbf24' : '#d97706' }}>🔗 +{channel.urls.length - 1}</span>}
+                    <div className="flex gap-1 mt-1"><button onClick={() => handleEditChannel(channel)} className="text-blue-500"><Edit2 className="w-3 h-3" /></button><button onClick={() => handleDeleteChannel(channel.id)} className="text-red-500"><Trash2 className="w-3 h-3" /></button></div>
                   </div>
                 ))}
               </div>
@@ -2261,27 +1681,21 @@ export default function AdminPanel() {
         {/* ==================== FOOTER ==================== */}
         {activeTab === "footer" && (
           <div>
-            <h2 className="text-xl font-black text-slate-900 mb-4">Footer Settings</h2>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs mb-6">
-              <h3 className="text-sm font-bold text-slate-800 mb-3">Description</h3>
-              <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Footer Description</label><textarea value={footerDesc} onChange={(e) => setFooterDesc(e.target.value)} className="w-full text-sm p-2 border border-slate-200 rounded-lg h-24" /></div>
-              <button onClick={saveFooterDataFn} className="mt-4 bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1"><Save className="w-3 h-3" /> Save</button>
+            <h2 className="text-xl font-black mb-4 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Footer Settings</h2>
+            <div className="rounded-xl border shadow-xs p-4 mb-6 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <h3 className="text-sm font-bold mb-3 transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Description</h3>
+              <div><label className="block text-[10px] font-bold uppercase mb-1 transition-colors duration-300" style={{ color: isDark ? darkTextMuted : '#64748b' }}>Footer Description</label><textarea value={footerDesc} onChange={(e) => setFooterDesc(e.target.value)} className="w-full text-sm p-2 border rounded-lg h-24 transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
+              <button onClick={saveFooter} className="mt-4 bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1"><Save className="w-3 h-3" /> Save</button>
             </div>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-slate-800">Social Media Links</h3>
-                <button onClick={addSocialLink} className="bg-blue-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1"><Plus className="w-3 h-3" /> Add Link</button>
-              </div>
+            <div className="rounded-xl border shadow-xs p-4 transition-colors duration-300" style={{ backgroundColor: isDark ? darkCardBg : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0' }}>
+              <div className="flex items-center justify-between mb-3"><h3 className="text-sm font-bold transition-colors duration-300" style={{ color: isDark ? darkText : '#0f172a' }}>Social Media Links</h3><button onClick={addSocialLink} className="bg-blue-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1"><Plus className="w-3 h-3" /> Add Link</button></div>
               {socialLinks.map((link, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-2 bg-slate-50 border border-slate-100 rounded-lg mb-2">
-                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <input type="text" placeholder="Platform name" value={link.platform} onChange={(e) => updateSocialLink(idx, 'platform', e.target.value)} className="text-xs p-2 border border-slate-200 rounded-lg" />
-                    <input type="text" placeholder="URL" value={link.url} onChange={(e) => updateSocialLink(idx, 'url', e.target.value)} className="text-xs p-2 border border-slate-200 rounded-lg" />
-                  </div>
+                <div key={idx} className="flex items-center gap-3 p-2 border rounded-lg mb-2 transition-colors duration-300" style={{ backgroundColor: isDark ? darkHover : '#f8fafc', borderColor: isDark ? darkBorder : '#f1f5f9' }}>
+                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2"><input type="text" placeholder="Platform name" value={link.platform} onChange={(e) => updateSocialLink(idx, 'platform', e.target.value)} className="text-xs p-2 border rounded-lg transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /><input type="text" placeholder="URL" value={link.url} onChange={(e) => updateSocialLink(idx, 'url', e.target.value)} className="text-xs p-2 border rounded-lg transition-colors duration-300" style={{ backgroundColor: isDark ? '#2d2d2d' : '#ffffff', borderColor: isDark ? darkBorder : '#e2e8f0', color: isDark ? darkText : '#0f172a' }} /></div>
                   <button onClick={() => removeSocialLink(idx)} className="text-red-500"><Trash2 className="w-4 h-4" /></button>
                 </div>
               ))}
-              <button onClick={saveSocialLinksData} className="mt-4 bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1"><Save className="w-3 h-3" /> Save Links</button>
+              <button onClick={saveSocialLinks} className="mt-4 bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1"><Save className="w-3 h-3" /> Save Links</button>
             </div>
           </div>
         )}
